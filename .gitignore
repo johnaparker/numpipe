@@ -1,0 +1,8 @@
+# python by-prducts
+*.pyc
+__pycache__
+*.egg-info
+
+# misc
+*.sw*
+*.h5
