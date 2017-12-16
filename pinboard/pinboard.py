@@ -6,6 +6,8 @@ import argparse
 import h5py
 import os
 import sys
+import types
+from h5cache import h5cache
 
 class Bunch:
     """Simply convert a dictionary into a class with data members equal to the dictionary keys"""
@@ -86,13 +88,17 @@ class pinboard:
            Arguments:
                store       {name: data} dictionary to write as additional data (optional)
         """
+        cache_size = 1000
+        chunk_size = 1000
 
         self._run_parser()
 
+        ### display only event
         if self.args.action == 'display':
             self.display_functions()
             return
 
+        ### write store to file
         if store is not None:
             with h5py.File(self.filepath, 'a') as f:
                 if 'store' in f:
@@ -100,33 +106,78 @@ class pinboard:
                 for name,value in store.items():
                     f[f'store/{name}'] = value
 
+        ### determine which functions to execute based on file and command line
         functions_to_execute = {}
-        with h5py.File(self.filepath, 'a') as f:
-            if self.args.rerun is None:
+        if self.args.rerun is None:
+            with h5py.File(self.filepath, 'r') as f:
                 for name,func in self.cached_functions.items():
                     if name not in f:
                         functions_to_execute[name] = func
 
-            elif len(self.args.rerun) == 0:
-                functions_to_execute.update(self.cached_functions)
+        elif len(self.args.rerun) == 0:
+            functions_to_execute.update(self.cached_functions)
 
+        else:
+            for name in self.args.rerun:
+                if name not in self.cached_functions.keys():
+                    raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
+                functions_to_execute[name] = self.cached_functions[name]
+
+        self._request_to_overwrite(groups=functions_to_execute.keys())
+
+        ### execute all items
+        for name,func in functions_to_execute.items():
+            print(f"Running cached function '{name}'")
+            symbols = func()
+
+            ### Generator functions
+            if isinstance(symbols, types.GeneratorType):
+                ### create all the caches based on the first set of symbols
+                cache = {}
+                next_symbols = next(symbols)
+                with h5py.File(self.filepath, 'a') as f:
+                    group = f.create_group(name)
+                    for symbol_name, next_symbol in next_symbols.items():
+
+                        if isinstance(next_symbol, np.ndarray):
+                            cache[symbol_name] = h5cache(next_symbol.shape, cache_size, next_symbol.dtype)
+                            dset = group.create_dataset(symbol_name, shape=(1,) + next_symbol.shape, chunks=(chunk_size,) + next_symbol.shape, maxshape=(None,) + next_symbol.shape, dtype=next_symbol.dtype)
+                        else:
+                            dtype = type(next_symbol)
+                            cache[symbol_name] = h5cache((), cache_size, dtype)
+                            dset = group.create_dataset(symbol_name, shape=(1,), chunks=(chunk_size,), maxshape=(None,), dtype=dtype)
+
+                        dset[...] = next_symbol
+
+                ### iterate over the remaining symbols, caching each one
+                for next_symbols in symbols:
+                    for symbol_name, next_symbol in next_symbols.items():
+                        symbol_cache = cache[symbol_name]
+                        if symbol_cache.is_full():
+                            with h5py.File(self.filepath, 'a') as f:
+                                group = f[name]
+                                dset = group[symbol_name]
+                                dset.resize((dset.shape[0]+cache.size,) + cache.shape)
+                                dset[-cache.size:] = symbol_cache.cache
+                        symbol_cache.add(next_symbol)
+
+                ### empty any of the remaining cache
+                for symbol_name, next_symbol in next_symbols.items():
+                    symbol_cache = cache[symbol_name]
+                    with h5py.File(self.filepath, 'a') as f:
+                        group = f[name]
+                        dset = group[symbol_name]
+                        dset.resize((dset.shape[0]+symbol_cache.current_record,) + symbol_cache.shape)
+                        dset[-symbol_cache.current_record:] = symbol_cache.cache[:symbol_cache.current_record]
+                    
+            ### Standard Functions
             else:
-                for name in self.args.rerun:
-                    if name not in self.cached_functions.keys():
-                        raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
-                    functions_to_execute[name] = self.cached_functions[name]
-
-            for name,func in functions_to_execute.items():
-                if name in f:
-                    self._request_to_overwrite(name)
-
-            for name,func in functions_to_execute.items():
-                print(f"Running cached function '{name}'")
-                symbols = func()
-                if not isinstance(symbols,dict):
+                if not isinstance(symbols, dict):
                     raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
+
                 self._write_symbols(symbols, name)
 
+        ### At-end functions
         if self.at_end_functions:
             print("Running at-end functions")
             for func in self.at_end_functions.values():
@@ -159,19 +210,33 @@ class pinboard:
         """write symbols to cache inside group"""
         write_symbols(self.filepath, symbols, group)
 
+    def _request_to_overwrite(self, groups):
+        """Request if existing hdf5 file should be overwriten
 
-    def _request_to_overwrite(self, group=None):
-        """request if existing hdf5 file should be overwriten"""
-        if group is None:
-            group = ''
+           Argumnets: 
+               groups        list of group names to check
+        """
+        groups_to_delete = []
         
-        with h5py.File(self.filepath, 'a') as f:
-            if not self.args.force and os.path.exists(self.filepath) and group in f:
-                delete = input(f"Do you really want to write over existing data in '{self.filepath}/{group}'? (y/n) ")
+        if groups:
+            with h5py.File(self.filepath, 'r') as f:
+                groups_to_delete.extend(filter(lambda group: group in f, groups))
+
+        if groups_to_delete:
+            summary = "The following cached data will be deleted:\n"
+            for group in groups_to_delete:
+                summary += f"{self.filepath}/{group}\n"
+
+            if not self.args.force:
+                print(summary)
+                delete = input(f"Continue with job? (y/n) ")
+
                 if delete != 'y':
                     sys.exit('Aborting...')
-            if group in f:
-                del f[group]
+
+            with h5py.File(self.filepath, 'a') as f:
+                for group in groups_to_delete:
+                    del f[group]
 
     def _run_parser(self):
         """parse user request"""
@@ -218,6 +283,13 @@ if __name__ == "__main__":
         """compute the cube of x"""
         z = x**3
         return {'z': z}
+
+    @job.cache
+    def sim3():
+        """compute the cube of x"""
+        for i in range(1001):
+            z = x*i
+            yield {'time_series': z, 'time': i}
 
     @job.at_end
     def vis():
