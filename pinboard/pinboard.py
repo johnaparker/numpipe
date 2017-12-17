@@ -7,7 +7,7 @@ import h5py
 import os
 import sys
 import types
-from h5cache import h5cache
+from h5cache import h5cache, npcache
 
 class Bunch:
     """Simply convert a dictionary into a class with data members equal to the dictionary keys"""
@@ -133,43 +133,20 @@ class pinboard:
             ### Generator functions
             if isinstance(symbols, types.GeneratorType):
                 ### create all the caches based on the first set of symbols
-                cache = {}
+                caches = {}
                 next_symbols = next(symbols)
-                with h5py.File(self.filepath, 'a') as f:
-                    group = f.create_group(name)
-                    for symbol_name, next_symbol in next_symbols.items():
-
-                        if isinstance(next_symbol, np.ndarray):
-                            cache[symbol_name] = h5cache(next_symbol.shape, cache_size, next_symbol.dtype)
-                            dset = group.create_dataset(symbol_name, shape=(1,) + next_symbol.shape, chunks=(chunk_size,) + next_symbol.shape, maxshape=(None,) + next_symbol.shape, dtype=next_symbol.dtype)
-                        else:
-                            dtype = type(next_symbol)
-                            cache[symbol_name] = h5cache((), cache_size, dtype)
-                            dset = group.create_dataset(symbol_name, shape=(1,), chunks=(chunk_size,), maxshape=(None,), dtype=dtype)
-
-                        dset[...] = next_symbol
+                for symbol_name, next_symbol in next_symbols.items():
+                    caches[symbol_name] = h5cache(self.filepath, name, symbol_name, next_symbol, chunk_size, cache_size)
 
                 ### iterate over the remaining symbols, caching each one
                 for next_symbols in symbols:
                     for symbol_name, next_symbol in next_symbols.items():
-                        symbol_cache = cache[symbol_name]
-                        if symbol_cache.is_full():
-                            with h5py.File(self.filepath, 'a') as f:
-                                group = f[name]
-                                dset = group[symbol_name]
-                                dset.resize((dset.shape[0]+cache.size,) + cache.shape)
-                                dset[-cache.size:] = symbol_cache.cache
-                        symbol_cache.add(next_symbol)
+                        caches[symbol_name].add(next_symbol)
 
                 ### empty any of the remaining cache
-                for symbol_name, next_symbol in next_symbols.items():
-                    symbol_cache = cache[symbol_name]
-                    with h5py.File(self.filepath, 'a') as f:
-                        group = f[name]
-                        dset = group[symbol_name]
-                        dset.resize((dset.shape[0]+symbol_cache.current_record,) + symbol_cache.shape)
-                        dset[-symbol_cache.current_record:] = symbol_cache.cache[:symbol_cache.current_record]
-                    
+                for cache in caches.values():
+                    cache.flush()
+
             ### Standard Functions
             else:
                 if not isinstance(symbols, dict):
@@ -287,7 +264,7 @@ if __name__ == "__main__":
     @job.cache
     def sim3():
         """compute the cube of x"""
-        for i in range(1001):
+        for i in range(2500):
             z = x*i
             yield {'time_series': z, 'time': i}
 
