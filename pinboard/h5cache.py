@@ -41,11 +41,27 @@ class npcache:
         self.current_record = 0
 
 
+def npcache_from(record, cache_size=1000):
+    """
+    Create an npcache from a record
+    
+    Arguments:
+        record       numpy array or scalar
+        cache_size   size of record cache (default: 1000)
+    """
+    if isinstance(record, np.ndarray):
+        cache = npcache(record.shape, cache_size, record.dtype)
+    else:
+        dtype = type(record)
+        cache = npcache((), cache_size, dtype)
+
+    cache.add(record) 
+    return cache
 
 class h5cache:
     def __init__(self, filepath, group, name, record, chunk_size=1000, cache_size=1000):
         """
-        npcache with output to hdf5 file
+        npcache with automatic output to hdf5 file
 
         Arguments:
             filepath     filepath to h5 file
@@ -63,15 +79,10 @@ class h5cache:
         self.cache_size = cache_size
 
         with h5py.File(self.filepath, 'a') as f:
-            if isinstance(record, np.ndarray):
-                dset = f.create_dataset(self.h5path, shape=(1,) + record.shape, chunks=(self.chunk_size,) + record.shape, maxshape=(None,) + record.shape, dtype=record.dtype)
-                self.npcache = npcache(record.shape, cache_size, record.dtype)
-            else:
-                dtype = type(record)
-                dset = f.create_dataset(self.h5path, shape=(1,), chunks=(chunk_size,), maxshape=(None,), dtype=dtype)
-                self.npcache = npcache((), cache_size, dtype)
-
-            dset[...] = record
+            self.npcache = npcache_from(record, cache_size)
+            dtype = self.npcache.cache.dtype
+            shape = self.npcache.shape
+            dset = f.create_dataset(self.h5path, shape=(0,) + shape, chunks=(self.chunk_size,) + shape, maxshape=(None,) + shape, dtype=dtype)
 
     def add(self, record):
         """

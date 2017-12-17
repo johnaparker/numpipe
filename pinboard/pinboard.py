@@ -7,7 +7,7 @@ import h5py
 import os
 import sys
 import types
-from h5cache import h5cache, npcache
+from h5cache import h5cache
 
 class Bunch:
     """Simply convert a dictionary into a class with data members equal to the dictionary keys"""
@@ -264,8 +264,8 @@ if __name__ == "__main__":
     @job.cache
     def sim3():
         """compute the cube of x"""
-        for i in range(2500):
-            z = x*i
+        for i in range(5):
+            z = x*i + 1
             yield {'time_series': z, 'time': i}
 
     @job.at_end
