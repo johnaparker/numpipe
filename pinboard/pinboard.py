@@ -37,10 +37,11 @@ def write_symbols(filepath, symbols):
 
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
-    def __init__(self, function, description=None, args=()):
+    def __init__(self, function, args=()):
         self.function = function
-        self.description = description
         self.args = args
+        self.__name__ = function.__name__ 
+        self.__doc__  = function.__doc__ 
 
     def __call__(self):
         return self.function(*self.args)
@@ -144,12 +145,12 @@ class pinboard:
 
     def cache(self, func):
         """decorator to add a cached function to be conditionally ran"""
-        self.cached_functions[func.__name__] = deferred_function(func, func.__doc__)
+        self.cached_functions[func.__name__] = deferred_function(func)
         return func
 
     def at_end(self, func):
         """decorator to add a function to be executed at the end"""
-        self.at_end_functions[func.__name__] = deferred_function(func, func.__doc__)
+        self.at_end_functions[func.__name__] = deferred_function(func)
         return func
 
     def shared(self, class_type):
@@ -159,11 +160,11 @@ class pinboard:
     def display_functions(self):
         print("cached functions:")
         for name,func in self.cached_functions.items():
-            print('\t', name, ' -- ', func.description, sep='')
+            print('\t', name, ' -- ', func.__doc__, sep='')
 
         print('\n', "at-end functions:", sep='')
         for name,func in self.at_end_functions.items():
-            print('\t', name, ' -- ', func.description, sep='')
+            print('\t', name, ' -- ', func.__doc__, sep='')
 
     def _write_symbols(self, name, symbols):
         """write symbols to cache inside group"""
