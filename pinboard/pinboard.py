@@ -7,8 +7,10 @@ import h5py
 import os
 import sys
 import types
-from .h5cache import h5cache
+from h5cache import h5cache
 from inspect import signature
+from multiprocessing import Pool
+from time import sleep
 
 class Bunch:
     """Simply convert a dictionary into a class with data members equal to the dictionary keys"""
@@ -101,8 +103,6 @@ class pinboard:
            Arguments:
                store       {name: data} dictionary to write as additional data (optional)
         """
-        cache_size = 1000
-        chunk_size = 1000
 
         self._run_parser()
 
@@ -150,39 +150,55 @@ class pinboard:
         self._request_to_overwrite(names=functions_to_execute.keys())
 
         ### execute all items
-        for name,func in functions_to_execute.items():
-            print(f"Running cached function '{name}'")
-            symbols = func()
-
-            ### Generator functions
-            if isinstance(symbols, types.GeneratorType):
-                ### create all the caches based on the first set of symbols
-                caches = {}
-                next_symbols = next(symbols)
-                for symbol_name, next_symbol in next_symbols.items():
-                    caches[symbol_name] = h5cache(self.targets[name].filepath, '', symbol_name, next_symbol, chunk_size, cache_size)
-
-                ### iterate over the remaining symbols, caching each one
-                for next_symbols in symbols:
-                    for symbol_name, next_symbol in next_symbols.items():
-                        caches[symbol_name].add(next_symbol)
-
-                ### empty any of the remaining cache
-                for cache in caches.values():
-                    cache.flush()
-
-            ### Standard Functions
-            else:
-                if not isinstance(symbols, dict):
-                    raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
-
-                self._write_symbols(name, symbols)
+        with Pool(processes=self.args.processes) as pool:
+            results = [pool.apply_async(self._execute_function, (func,name)) for name,func in functions_to_execute.items()]
+            # while results:
+                # for result in results:
+                    # if result.ready():
+                        # result.get()
+                        # results.remove(result)
+                    # else:
+                        # print('progress')
+                # sleep(.1)
+            pool.close()
+            pool.join()
 
         ### At-end functions
         if self.at_end_functions:
             print("Running at-end functions")
             for func in self.at_end_functions.values():
                 func()
+
+    def _execute_function(self, func, name):
+        cache_size = 1000
+        chunk_size = 1000
+
+        print(f"Running cached function '{name}'")
+        symbols = func()
+
+        ### Generator functions
+        if isinstance(symbols, types.GeneratorType):
+            ### create all the caches based on the first set of symbols
+            caches = {}
+            next_symbols = next(symbols)
+            for symbol_name, next_symbol in next_symbols.items():
+                caches[symbol_name] = h5cache(self.targets[name].filepath, '', symbol_name, next_symbol, chunk_size, cache_size)
+
+            ### iterate over the remaining symbols, caching each one
+            for next_symbols in symbols:
+                for symbol_name, next_symbol in next_symbols.items():
+                    caches[symbol_name].add(next_symbol)
+
+            ### empty any of the remaining cache
+            for cache in caches.values():
+                cache.flush()
+
+        ### Standard Functions
+        else:
+            if not isinstance(symbols, dict):
+                raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
+
+            self._write_symbols(name, symbols)
 
     def add_instance(self, name, func, *args, **kwargs):
         """
@@ -268,6 +284,7 @@ class pinboard:
         parser = argparse.ArgumentParser()
         parser.add_argument('-r', '--rerun', nargs='*', type=str, default=None, help='re-run specific cached functions by name')
         parser.add_argument('-f', '--force', action='store_true', help='force over-write any existing cached data')
+        parser.add_argument('-np', '--processes', type=int, default=1, help='number of processes to use in parallel execution')
 
         subparsers = parser.add_subparsers(dest="action")
         display_parser = subparsers.add_parser('display', help='display available functions and descriptions')
@@ -318,6 +335,7 @@ if __name__ == "__main__":
     @job.cache
     def sim4(param):
         """sim depends on parameter"""
+        sleep(1)
         x = np.array([1,2,3])
         return {'y': param*x} 
 
