@@ -7,7 +7,7 @@ import h5py
 import os
 import sys
 import types
-from h5cache import h5cache
+from .h5cache import h5cache
 from inspect import signature
 
 class Bunch:
