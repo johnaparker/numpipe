@@ -14,41 +14,26 @@ class Bunch:
     def __init__(self, adict):
         self.__dict__.update(adict)
 
-def load_symbols(filepath, group_name=None):
-    """Load all symbols from h5 filepath, group (all groups if None)"""
+def load_symbols(filepath):
+    """Load all symbols from h5 filepath"""
 
     collection = {}
     with h5py.File(filepath, 'r') as f:
-        if group_name is None:
-            for group_name in f:
-                group = f[group_name]
-
-                symbols = {}
-                for dset_name in group:
-                    symbols[dset_name] = group[dset_name][...]
-
-                collection[group_name] = Bunch(symbols)
-        else:
-            group = f[group_name]
-            for dset_name in group:
-                collection[dset_name] = group[dset_name][...]
+        for dset_name in f:
+            collection[dset_name] = f[dset_name][...]
 
     return Bunch(collection)
 
-def write_symbols(filepath, symbols, group=None):
+def write_symbols(filepath, symbols):
     """Write all symbols to h5 file, where symbols is a {name: value} dictionary
        
        Arguments:
            filepath      path to file
            symbols       {name: vale} dictionary
-           group         group to write symbols to (default: root)
     """
-    if group is None:
-        group = ''
-
     with h5py.File(filepath, 'a') as f:
         for name,symbol in symbols.items():
-            f[f'{group}/{name}'] = symbol
+            f[name] = symbol
 
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
@@ -63,24 +48,24 @@ class deferred_function:
 class pinboard:
     """Deferred function evaluation and access to cached function output"""
 
-    def __init__(self, filepath):
-        """filepath to hdf5 file to cache data"""
-
-        self.filepath = filepath
+    def __init__(self):
         self.cached_functions = {}
         self.at_end_functions = {}
 
     def load(self, function=None):
         """
-        Load cached symbols for {}particular function
-        If function is None, read symbols for all registered functions
+        Load cached symbols for particular function
+        If function is None, read symbols for all functions
         """
         if function is None:
-            group = None
+            filepath = None
         else:
-            group = function.__name__
+            filepath = f'{function.__name__}.h5'
 
-        return load_symbols(self.filepath, group)
+        return load_symbols(filepath)
+
+    def defer_load(self, function=None):
+        pass
 
     def execute(self, store=None):
         """Run the requested cached functions and at-end functions
@@ -100,19 +85,16 @@ class pinboard:
 
         ### write store to file
         if store is not None:
-            with h5py.File(self.filepath, 'a') as f:
-                if 'store' in f:
-                    del f['store']
+            with h5py.File('store.h5', 'w') as f:
                 for name,value in store.items():
-                    f[f'store/{name}'] = value
+                    f[name] = value
 
         ### determine which functions to execute based on file and command line
         functions_to_execute = {}
         if self.args.rerun is None:
-            with h5py.File(self.filepath, 'r') as f:
-                for name,func in self.cached_functions.items():
-                    if name not in f:
-                        functions_to_execute[name] = func
+            for name,func in self.cached_functions.items():
+                if not os.path.isfile(f'{name}.h5'):
+                    functions_to_execute[name] = func
 
         elif len(self.args.rerun) == 0:
             functions_to_execute.update(self.cached_functions)
@@ -123,7 +105,7 @@ class pinboard:
                     raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
                 functions_to_execute[name] = self.cached_functions[name]
 
-        self._request_to_overwrite(groups=functions_to_execute.keys())
+        self._request_to_overwrite(names=functions_to_execute.keys())
 
         ### execute all items
         for name,func in functions_to_execute.items():
@@ -136,7 +118,7 @@ class pinboard:
                 caches = {}
                 next_symbols = next(symbols)
                 for symbol_name, next_symbol in next_symbols.items():
-                    caches[symbol_name] = h5cache(self.filepath, name, symbol_name, next_symbol, chunk_size, cache_size)
+                    caches[symbol_name] = h5cache(f'{name}.h5', '', symbol_name, next_symbol, chunk_size, cache_size)
 
                 ### iterate over the remaining symbols, caching each one
                 for next_symbols in symbols:
@@ -152,7 +134,7 @@ class pinboard:
                 if not isinstance(symbols, dict):
                     raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
 
-                self._write_symbols(symbols, name)
+                self._write_symbols(name, symbols)
 
         ### At-end functions
         if self.at_end_functions:
@@ -183,26 +165,25 @@ class pinboard:
         for name,func in self.at_end_functions.items():
             print('\t', name, ' -- ', func.description, sep='')
 
-    def _write_symbols(self, symbols, group=None):
+    def _write_symbols(self, name, symbols):
         """write symbols to cache inside group"""
-        write_symbols(self.filepath, symbols, group)
+        write_symbols(f'{name}.h5', symbols)
 
-    def _request_to_overwrite(self, groups):
+    def _request_to_overwrite(self, names):
         """Request if existing hdf5 file should be overwriten
 
            Argumnets: 
-               groups        list of group names to check
+               names        list of group names to check
         """
-        groups_to_delete = []
+        data_to_delete = []
         
-        if groups:
-            with h5py.File(self.filepath, 'r') as f:
-                groups_to_delete.extend(filter(lambda group: group in f, groups))
+        if names:
+            data_to_delete.extend(filter(lambda name: os.path.isfile(f'{name}.h5'), names))
 
-        if groups_to_delete:
+        if data_to_delete:
             summary = "The following cached data will be deleted:\n"
-            for group in groups_to_delete:
-                summary += f"{self.filepath}/{group}\n"
+            for data in data_to_delete:
+                summary += f"{data}.h5\n"
 
             if not self.args.force:
                 print(summary)
@@ -211,9 +192,8 @@ class pinboard:
                 if delete != 'y':
                     sys.exit('Aborting...')
 
-            with h5py.File(self.filepath, 'a') as f:
-                for group in groups_to_delete:
-                    del f[group]
+            for data in data_to_delete:
+                os.remove(f"{data}.h5")
 
     def _run_parser(self):
         """parse user request"""
@@ -231,8 +211,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     ### Setup
-    filepath = 'temp.h5'
-    job = pinboard(filepath)
+    job = pinboard()
 
     ### Fast, shared code goes here
     x = np.linspace(0,1,10)
@@ -263,7 +242,7 @@ if __name__ == "__main__":
 
     @job.cache
     def sim3():
-        """compute the cube of x"""
+        """construct a time-series"""
         for i in range(5):
             z = x*i + 1
             yield {'time_series': z, 'time': i}
@@ -271,9 +250,10 @@ if __name__ == "__main__":
     @job.at_end
     def vis():
         """visualize the data"""
-        sim = job.load()
-        plt.plot(x,sim.sim1.y)
-        plt.plot(x,sim.sim2.z)
+        cache = job.load(sim1)
+        plt.plot(x, cache.y)
+        cache = job.load(sim2)
+        plt.plot(x, cache.z)
         plt.show()
 
     ### execute
