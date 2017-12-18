@@ -51,7 +51,26 @@ class target:
     A target is the output of a cached function and determines whether it needs to be rerun
     It specifies the type of storage file
     """
-    pass
+    def __init__(self, filepath):
+        self.filepath = filepath
+
+    def load(self):
+        """Load symbols"""
+        return load_symbols(self.filepath)
+
+    def write(self, symbols):
+        """Write symbols"""
+        write_symbols(self.filepath, symbols)
+
+    def exists(self):
+        """Return true if the target exists"""
+        if os.path.isfile(self.filepath):
+            return True
+        else:
+            return False
+
+    def remove(self):
+        os.remove(self.filepath)
 
 class pinboard:
     """Deferred function evaluation and access to cached function output"""
@@ -59,18 +78,15 @@ class pinboard:
     def __init__(self):
         self.cached_functions = {}
         self.at_end_functions = {}
+        self.targets = {}
 
     def load(self, function=None):
         """
         Load cached symbols for particular function
         If function is None, read symbols for all functions
         """
-        if function is None:
-            filepath = None
-        else:
-            filepath = f'{function.__name__}.h5'
 
-        return load_symbols(filepath)
+        return self.targets[function.__name__].load()
 
     def defer_load(self, function=None):
         pass
@@ -101,7 +117,7 @@ class pinboard:
         functions_to_execute = {}
         if self.args.rerun is None:
             for name,func in self.cached_functions.items():
-                if not os.path.isfile(f'{name}.h5'):
+                if not self.targets[name].exists():
                     functions_to_execute[name] = func
 
         elif len(self.args.rerun) == 0:
@@ -126,7 +142,7 @@ class pinboard:
                 caches = {}
                 next_symbols = next(symbols)
                 for symbol_name, next_symbol in next_symbols.items():
-                    caches[symbol_name] = h5cache(f'{name}.h5', '', symbol_name, next_symbol, chunk_size, cache_size)
+                    caches[symbol_name] = h5cache(self.targets[name].filepath, '', symbol_name, next_symbol, chunk_size, cache_size)
 
                 ### iterate over the remaining symbols, caching each one
                 for next_symbols in symbols:
@@ -153,6 +169,8 @@ class pinboard:
     def cache(self, func):
         """decorator to add a cached function to be conditionally ran"""
         self.cached_functions[func.__name__] = deferred_function(func)
+        filepath = f'{func.__name__}.h5'
+        self.targets[func.__name__] = target(filepath)
         return func
 
     def at_end(self, func):
@@ -175,7 +193,7 @@ class pinboard:
 
     def _write_symbols(self, name, symbols):
         """write symbols to cache inside group"""
-        write_symbols(f'{name}.h5', symbols)
+        self.targets[name].write(symbols)
 
     def _request_to_overwrite(self, names):
         """Request if existing hdf5 file should be overwriten
@@ -186,12 +204,12 @@ class pinboard:
         data_to_delete = []
         
         if names:
-            data_to_delete.extend(filter(lambda name: os.path.isfile(f'{name}.h5'), names))
+            data_to_delete.extend(filter(lambda name: self.targets[name].exists(), names))
 
         if data_to_delete:
             summary = "The following cached data will be deleted:\n"
             for data in data_to_delete:
-                summary += f"{data}.h5\n"
+                summary += self.targets[data].filepath + '\n'
 
             if not self.args.force:
                 print(summary)
@@ -201,7 +219,7 @@ class pinboard:
                     sys.exit('Aborting...')
 
             for data in data_to_delete:
-                os.remove(f"{data}.h5")
+                self.targets[data].remove()
 
     def _run_parser(self):
         """parse user request"""
