@@ -8,6 +8,7 @@ import os
 import sys
 import types
 from h5cache import h5cache
+from inspect import signature
 
 class Bunch:
     """Simply convert a dictionary into a class with data members equal to the dictionary keys"""
@@ -37,14 +38,15 @@ def write_symbols(filepath, symbols):
 
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
-    def __init__(self, function, args=()):
+    def __init__(self, function, args=(), kwargs={}):
         self.function = function
         self.args = args
+        self.kwargs = kwargs
         self.__name__ = function.__name__ 
         self.__doc__  = function.__doc__ 
 
     def __call__(self):
-        return self.function(*self.args)
+        return self.function(*self.args, **self.kwargs)
 
 class target:
     """
@@ -79,6 +81,8 @@ class pinboard:
         self.cached_functions = {}
         self.at_end_functions = {}
         self.targets = {}
+        self.instances = {}
+        self.instance_functions = {}
 
     def load(self, function=None):
         """
@@ -120,14 +124,28 @@ class pinboard:
                 if not self.targets[name].exists():
                     functions_to_execute[name] = func
 
+            for base,instances in self.instances.items():
+                for name,instance in instances.items():
+                    if not self.targets[name].exists():
+                        functions_to_execute[name] = instance
+
         elif len(self.args.rerun) == 0:
             functions_to_execute.update(self.cached_functions)
+            for instances in self.instances.values():
+                functions_to_execute.update(instances)
 
         else:
             for name in self.args.rerun:
-                if name not in self.cached_functions.keys():
-                    raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
-                functions_to_execute[name] = self.cached_functions[name]
+                if name in self.cached_functions.keys():
+                    functions_to_execute[name] = self.cached_functions[name]
+                elif name in self.instances.keys():
+                    functions_to_execute.update(self.instances[name])
+                else:
+                    try:
+                        base = name.split('-')[0]
+                        functions_to_execute[name] = self.instances[base][name]
+                    except KeyError:
+                        raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
 
         self._request_to_overwrite(names=functions_to_execute.keys())
 
@@ -166,11 +184,27 @@ class pinboard:
             for func in self.at_end_functions.values():
                 func()
 
+    def add_instance(self, name, func, *args, **kwargs):
+        """
+        Add an instance (a function with specified args and kwargs)
+        """
+        filepath = f'{func.__name__}-{name}.h5'
+        func_name = f'{func.__name__}-{name}'
+        
+        self.targets[func_name] = target(filepath)
+        self.instances[func.__name__][func_name] = deferred_function(func, args, kwargs)
+
     def cache(self, func):
         """decorator to add a cached function to be conditionally ran"""
-        self.cached_functions[func.__name__] = deferred_function(func)
-        filepath = f'{func.__name__}.h5'
-        self.targets[func.__name__] = target(filepath)
+        sig = signature(func)
+        if not sig.parameters:
+            self.cached_functions[func.__name__] = deferred_function(func)
+            filepath = f'{func.__name__}.h5'
+            self.targets[func.__name__] = target(filepath)
+        else:
+            self.instances[func.__name__] = {}
+            self.instance_functions[func.__name__] = func
+
         return func
 
     def at_end(self, func):
@@ -186,6 +220,14 @@ class pinboard:
         print("cached functions:")
         for name,func in self.cached_functions.items():
             print('\t', name, ' -- ', func.__doc__, sep='')
+
+        for base,instance in self.instances.items():
+            print('\t', base, ' -- ', self.instance_functions[base].__doc__, sep='')
+            print('\t ', f'[{len(instance)} instances] ', end='')
+            for name, func in instance.items():
+                subname = name.split('-')[1]
+                print(subname, end=' ')
+            print('')
 
         print('\n', "at-end functions:", sep='')
         for name,func in self.at_end_functions.items():
@@ -272,6 +314,16 @@ if __name__ == "__main__":
         for i in range(5):
             z = x*i + 1
             yield {'time_series': z, 'time': i}
+
+    @job.cache
+    def sim4(param):
+        """sim depends on parameter"""
+        x = np.array([1,2,3])
+        return {'y': param*x} 
+
+    job.add_instance('p2', sim4, 2)
+    job.add_instance('p3', sim4, 3)
+    job.add_instance('p4', sim4, 4)
 
     @job.at_end
     def vis():
