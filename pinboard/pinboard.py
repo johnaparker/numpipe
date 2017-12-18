@@ -46,6 +46,13 @@ class deferred_function:
     def __call__(self):
         return self.function(*self.args)
 
+class target:
+    """
+    A target is the output of a cached function and determines whether it needs to be rerun
+    It specifies the type of storage file
+    """
+    pass
+
 class pinboard:
     """Deferred function evaluation and access to cached function output"""
 

@@ -2,22 +2,43 @@ import h5py
 import numpy as np
 
 def write_over(group, name, data):
-    """write over group[data] if it exists, otherwise create it
-               group           group or file object
-               name            name of dataset
-               data            data to write
+    """
+    Write over group[data] if it exists, otherwise create it
+
+    Arguments:
+        group           group or file object
+        name            name of dataset
+        data            data to write
     """
     if name in group:
         group[name][...] = data
     else:
         group[name] = data
 
+def strformat_to_bytes(strformat):
+    """
+    Convert a string (like "5M") to number of bytes (int)
+    """
+
+    suffixes = {'B': 1}
+    suffixes['K'] = 1000*suffixes['B']
+    suffixes['M'] = 1000*suffixes['K']
+    suffixes['G'] = 1000*suffixes['M']
+    suffixes['T'] = 1000*suffixes['G']
+    
+    suffix = strformat[-1] 
+    amount = int(strformat[:-1])
+    return amount*suffixes[suffix]
+
 class npcache:
-    def __init__(self, shape, size, dtype):
-        """cache a numpy array
-                shape       size of numpy array
-                size        number of records to be cached
-                dtype       array datatype
+    def __init__(self, shape, dtype, size=1000):
+        """
+        Cache a numpy array
+
+        Arguments:
+            shape       size of numpy array
+            dtype       array datatype
+            size        number of records to be cached
         """
         cache_shape = (size,) + shape
 
@@ -50,10 +71,10 @@ def npcache_from(record, cache_size=1000):
         cache_size   size of record cache (default: 1000)
     """
     if isinstance(record, np.ndarray):
-        cache = npcache(record.shape, cache_size, record.dtype)
+        cache = npcache(record.shape, record.dtype, cache_size)
     else:
         dtype = type(record)
-        cache = npcache((), cache_size, dtype)
+        cache = npcache((), dtype, cache_size)
 
     cache.add(record) 
     return cache
