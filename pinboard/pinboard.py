@@ -7,7 +7,7 @@ import h5py
 import os
 import sys
 import types
-from h5cache import h5cache
+from pinboard.h5cache import h5cache
 from inspect import signature
 from multiprocessing import Pool
 from time import sleep
@@ -92,7 +92,10 @@ class pinboard:
         If function is None, read symbols for all functions
         """
 
-        return self.targets[function.__name__].load()
+        if isinstance(function, str):
+            return self.targets[function].load()
+        else:
+            return self.targets[function.__name__].load()
 
     def defer_load(self, function=None):
         pass
