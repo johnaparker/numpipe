@@ -19,5 +19,4 @@ def progress():
     return {}
 
 ### execute
-print('hi')
 job.execute()

@@ -116,19 +116,28 @@ class pinboard:
         self.pipe.connect(address)
         self.pipe.sendall(pickle.dumps(['batch', 'ID']))
 
-    def load(self, function=None):
+    #TODO implement load all, jdefer
+    def load(self, function=None, instance=None, defer=False):
         """
         Load cached symbols for particular function
-        If function is None, read symbols for all functions
+
+        Arguments:
+            function     name of cached function (if None: load all cached functions)
+            instance     name of instance (if None: load all instances)
+            defer        If True, defer loading
         """
 
-        if isinstance(function, str):
-            return self.targets[function].load()
-        else:
-            return self.targets[function.__name__].load()
+        target_name = function.__name__
 
-    def defer_load(self, function=None):
-        pass
+        if function.__name__ in self.instance_functions.keys():
+            if instance is None:
+                #load all instances
+                pass
+            else:
+                target_name += f'-{instance}'
+
+        return self.targets[target_name].load()
+
 
     def execute(self, store=None):
         """Run the requested cached functions and at-end functions

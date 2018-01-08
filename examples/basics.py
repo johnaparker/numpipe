@@ -56,6 +56,9 @@ def vis():
     plt.plot(x, cache.y)
     cache = job.load(sim2)
     plt.plot(x, cache.z)
+
+    cache = job.load(sim4, 'p2')
+    # with job.load(sim4, defer=True) as cache:
     plt.show()
 
 ### execute
