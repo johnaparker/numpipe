@@ -11,6 +11,27 @@ from pinboard.h5cache import h5cache
 from inspect import signature
 from multiprocessing import Pool
 from time import sleep
+from functools import wraps
+import socket
+import pickle
+
+def doublewrap(f):
+    """
+    a decorator decorator, allowing the decorator to be used as:
+    @decorator(with, arguments, and=kwargs)
+    or
+    @decorator
+    """
+    @wraps(f)
+    def new_dec(*args, **kwargs):
+        if len(args) == 2 and len(kwargs) == 0 and callable(args[1]):
+            # actual decorated function
+            return f(*args)
+        else:
+            # decorator arguments
+            return lambda realf: f(args[0], realf, *args[1:], **kwargs)
+
+    return new_dec
 
 class Bunch:
     """Simply convert a dictionary into a class with data members equal to the dictionary keys"""
@@ -40,12 +61,15 @@ def write_symbols(filepath, symbols):
 
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
-    def __init__(self, function, args=(), kwargs={}):
+    def __init__(self, function, args=(), kwargs={}, iterations=None):
         self.function = function
         self.args = args
         self.kwargs = kwargs
         self.__name__ = function.__name__ 
         self.__doc__  = function.__doc__ 
+
+        self.iterations = iterations
+        self.current_iteration = 0
 
     def __call__(self):
         return self.function(*self.args, **self.kwargs)
@@ -85,6 +109,12 @@ class pinboard:
         self.targets = {}
         self.instances = {}
         self.instance_functions = {}
+        self.instance_iterations = {}
+
+        address = ('localhost', 6000)
+        self.pipe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.pipe.connect(address)
+        self.pipe.sendall(pickle.dumps(['batch', 'ID']))
 
     def load(self, function=None):
         """
@@ -154,7 +184,10 @@ class pinboard:
 
         ### execute all items
         with Pool(processes=self.args.processes) as pool:
-            results = [pool.apply_async(self._execute_function, (func,name)) for name,func in functions_to_execute.items()]
+            for name, func in functions_to_execute.items():
+                pool.apply_async(self._execute_function, (func,name))
+
+            # results = [pool.apply_async(self._execute_function, (func,name)) for name,func in functions_to_execute.items()]
             # while results:
                 # for result in results:
                     # if result.ready():
@@ -211,18 +244,21 @@ class pinboard:
         func_name = f'{func.__name__}-{name}'
         
         self.targets[func_name] = target(filepath)
-        self.instances[func.__name__][func_name] = deferred_function(func, args, kwargs)
+        iterations = self.instance_iterations[func.__name__]
+        self.instances[func.__name__][func_name] = deferred_function(func, args, kwargs, iterations=iterations)
 
-    def cache(self, func):
+    @doublewrap
+    def cache(self, func, iterations=None):
         """decorator to add a cached function to be conditionally ran"""
         sig = signature(func)
         if not sig.parameters:
-            self.cached_functions[func.__name__] = deferred_function(func)
+            self.cached_functions[func.__name__] = deferred_function(func, iterations=iterations)
             filepath = f'{func.__name__}.h5'
             self.targets[func.__name__] = target(filepath)
         else:
             self.instances[func.__name__] = {}
             self.instance_functions[func.__name__] = func
+            self.instance_iterations[func.__name__] = iterations
 
         return func
 

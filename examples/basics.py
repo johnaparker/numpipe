@@ -32,10 +32,10 @@ def sim2():
     z = x**3
     return {'z': z}
 
-@job.cache
-def sim3():
+@job.cache(iterations=5)
+def sim3(self):
     """construct a time-series"""
-    for i in range(5):
+    for i in self.iterations():
         z = x*i + 1
         yield {'time_series': z, 'time': i}
 
