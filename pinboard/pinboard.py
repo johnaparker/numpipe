@@ -245,7 +245,7 @@ class pinboard:
 
             self._write_symbols(name, symbols)
 
-    def add_instance(self, name, func, *args, **kwargs):
+    def add_instance(self, func, name, *args, **kwargs):
         """
         Add an instance (a function with specified args and kwargs)
         """
