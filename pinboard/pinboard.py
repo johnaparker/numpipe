@@ -259,6 +259,17 @@ class pinboard:
         iterations = self.instance_iterations[func.__name__]
         self.instances[func.__name__][func_name] = deferred_function(func, args, kwargs, iterations=iterations)
 
+    def add_instances(self, func, instances):
+        """
+        Add multiple instances
+
+        Arguments:
+            func        cached function
+            instances   dictionary of name: dict(kwargs)
+        """
+        for instance_name, kwargs in instances.items():
+            self.add_instance(func, instance_name, **kwargs)
+
     @doublewrap
     def cache(self, func, iterations=None):
         """decorator to add a cached function to be conditionally ran"""
