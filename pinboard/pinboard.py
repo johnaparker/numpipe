@@ -10,7 +10,7 @@ import types
 from pinboard.h5cache import h5cache
 from inspect import signature
 import multiprocessing
-from multiprocessing import Pool
+from multiprocessing import Pool, Value
 import traceback
 from time import sleep
 from functools import wraps
@@ -69,20 +69,32 @@ def write_symbols(filepath, symbols):
         for name,symbol in symbols.items():
             f[name] = symbol
 
+current_iteration = Value('i', 0)
+
+class first_argument:
+    def __init__(self, num_iterations=None):
+        self.num_iterations = num_iterations
+
+    def iterations(self):
+        def gen():
+            for i in range(self.num_iterations):
+                yield current_iteration.value
+                current_iteration.value += 1
+        return gen()
+
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
-    def __init__(self, function, args=(), kwargs={}, iterations=None):
+    def __init__(self, function, args=(), kwargs={}, num_iterations=None):
         self.function = function
         self.args = args
         self.kwargs = kwargs
         self.__name__ = function.__name__ 
         self.__doc__  = function.__doc__ 
 
-        self.iterations = iterations
-        self.current_iteration = 0
+        self.arg = first_argument(num_iterations=num_iterations)
 
     def __call__(self):
-        return self.function(*self.args, **self.kwargs)
+        return self.function(self.arg, *self.args, **self.kwargs)
 
 class target:
     """
@@ -221,17 +233,20 @@ class pinboard:
                 try:
                     result.get()
                 except Exception as e:
-                    print(dir(result))
                     print(e)  # failed simulation; print instead of abort
 
             pool.close()
             pool.join()
+
 
         ### At-end functions
         if self.at_end_functions:
             print("Running at-end functions")
             for func in self.at_end_functions.values():
                 func()
+
+        for name, func in self.cached_functions.items():
+            print(name, current_iteration.value)
 
     # @yield_traceback
     def _execute_function(self, func, name):
@@ -266,7 +281,7 @@ class pinboard:
 
                 self._write_symbols(name, symbols)
         except:
-            raise Exception(f"{name} failed: " + "".join(traceback.format_exception(*sys.exc_info())))
+            raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
     def add_instance(self, func, name, *args, **kwargs):
         """
@@ -277,7 +292,7 @@ class pinboard:
         
         self.targets[func_name] = target(filepath)
         iterations = self.instance_iterations[func.__name__]
-        self.instances[func.__name__][func_name] = deferred_function(func, args, kwargs, iterations=iterations)
+        self.instances[func.__name__][func_name] = deferred_function(func, args, kwargs, iterations=num_iterations)
 
     def add_instances(self, func, instances):
         """
@@ -294,8 +309,8 @@ class pinboard:
     def cache(self, func, iterations=None):
         """decorator to add a cached function to be conditionally ran"""
         sig = signature(func)
-        if not sig.parameters:
-            self.cached_functions[func.__name__] = deferred_function(func, iterations=iterations)
+        if len(sig.parameters) == 1:
+            self.cached_functions[func.__name__] = deferred_function(func, num_iterations=iterations)
             filepath = f'{func.__name__}.h5'
             self.targets[func.__name__] = target(filepath)
         else:

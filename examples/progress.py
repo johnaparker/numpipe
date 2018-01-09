@@ -7,14 +7,13 @@ job = pinboard()
 N = 100
 T = 3
 
-@job.cache
-def progress():
+@job.cache(iterations=N)
+def progress(self):
     progress = 0
 
-    for i in range(N):
+    for i in self.iterations():
         sleep(T/N)
-        progress += 1
-        print(progress)
+        # print(self.current_iteration)
 
     return {}
 

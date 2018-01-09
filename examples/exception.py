@@ -24,7 +24,6 @@ def second():
     return {}
 
 
-
 @job.cache
 def third():
     progress = 0
