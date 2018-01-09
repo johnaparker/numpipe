@@ -9,7 +9,9 @@ import sys
 import types
 from pinboard.h5cache import h5cache
 from inspect import signature
+import multiprocessing
 from multiprocessing import Pool
+import traceback
 from time import sleep
 from functools import wraps
 import socket
@@ -32,6 +34,14 @@ def doublewrap(f):
             return lambda realf: f(args[0], realf, *args[1:], **kwargs)
 
     return new_dec
+
+def yield_traceback(f):
+    def wrap_f(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except:
+            raise Exception("".join(traceback.format_exception(*sys.exc_info())))
+    return wrap_f
 
 class Bunch:
     """Simply convert a dictionary into a class with data members equal to the dictionary keys"""
@@ -206,8 +216,14 @@ class pinboard:
                     # else:
                         # print('progress')
                 # sleep(.1)
+
             for result in results:
-                result.get()
+                try:
+                    result.get()
+                except Exception as e:
+                    print(dir(result))
+                    print(e)  # failed simulation; print instead of abort
+
             pool.close()
             pool.join()
 
@@ -217,36 +233,40 @@ class pinboard:
             for func in self.at_end_functions.values():
                 func()
 
+    # @yield_traceback
     def _execute_function(self, func, name):
-        cache_size = 1000
-        chunk_size = 1000
+        try:
+            cache_size = 1000
+            chunk_size = 1000
 
-        print(f"Running cached function '{name}'")
-        symbols = func()
+            print(f"Running cached function '{name}'")
+            symbols = func()
 
-        ### Generator functions
-        if isinstance(symbols, types.GeneratorType):
-            ### create all the caches based on the first set of symbols
-            caches = {}
-            next_symbols = next(symbols)
-            for symbol_name, next_symbol in next_symbols.items():
-                caches[symbol_name] = h5cache(self.targets[name].filepath, '', symbol_name, next_symbol, chunk_size, cache_size)
-
-            ### iterate over the remaining symbols, caching each one
-            for next_symbols in symbols:
+            ### Generator functions
+            if isinstance(symbols, types.GeneratorType):
+                ### create all the caches based on the first set of symbols
+                caches = {}
+                next_symbols = next(symbols)
                 for symbol_name, next_symbol in next_symbols.items():
-                    caches[symbol_name].add(next_symbol)
+                    caches[symbol_name] = h5cache(self.targets[name].filepath, '', symbol_name, next_symbol, chunk_size, cache_size)
 
-            ### empty any of the remaining cache
-            for cache in caches.values():
-                cache.flush()
+                ### iterate over the remaining symbols, caching each one
+                for next_symbols in symbols:
+                    for symbol_name, next_symbol in next_symbols.items():
+                        caches[symbol_name].add(next_symbol)
 
-        ### Standard Functions
-        else:
-            if not isinstance(symbols, dict):
-                raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
+                ### empty any of the remaining cache
+                for cache in caches.values():
+                    cache.flush()
 
-            self._write_symbols(name, symbols)
+            ### Standard Functions
+            else:
+                if not isinstance(symbols, dict):
+                    raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
+
+                self._write_symbols(name, symbols)
+        except:
+            raise Exception(f"{name} failed: " + "".join(traceback.format_exception(*sys.exc_info())))
 
     def add_instance(self, func, name, *args, **kwargs):
         """
