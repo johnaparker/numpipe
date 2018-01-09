@@ -11,11 +11,13 @@ from pinboard.h5cache import h5cache
 from inspect import signature
 import multiprocessing
 from multiprocessing import Pool, Value
+import threading
 import traceback
 from time import sleep
 from functools import wraps
 import socket
 import pickle
+
 
 def doublewrap(f):
     """
@@ -69,29 +71,34 @@ def write_symbols(filepath, symbols):
         for name,symbol in symbols.items():
             f[name] = symbol
 
-current_iteration = Value('i', 0)
+current_iteration = {}
+
 
 class first_argument:
-    def __init__(self, num_iterations=None):
+    def __init__(self, name, num_iterations=None):
+        self.name = name
         self.num_iterations = num_iterations
+        if num_iterations is not None:
+            current_iteration[name] = Value('i', 0)
 
     def iterations(self):
         def gen():
             for i in range(self.num_iterations):
-                yield current_iteration.value
-                current_iteration.value += 1
+                yield current_iteration[self.name].value
+                current_iteration[self.name].value += 1
         return gen()
 
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
-    def __init__(self, function, args=(), kwargs={}, num_iterations=None):
+    def __init__(self, function, name, args=(), kwargs={}, num_iterations=None):
         self.function = function
         self.args = args
         self.kwargs = kwargs
         self.__name__ = function.__name__ 
         self.__doc__  = function.__doc__ 
+        self.name = name
 
-        self.arg = first_argument(num_iterations=num_iterations)
+        self.arg = first_argument(name, num_iterations=num_iterations)
 
     def __call__(self):
         return self.function(self.arg, *self.args, **self.kwargs)
@@ -137,6 +144,8 @@ class pinboard:
         self.pipe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.pipe.connect(address)
         self.pipe.sendall(pickle.dumps(['batch', 'ID']))
+
+        self.complete = False
 
     #TODO implement load all, jdefer
     def load(self, function=None, instance=None, defer=False):
@@ -229,6 +238,9 @@ class pinboard:
                         # print('progress')
                 # sleep(.1)
 
+            t = threading.Thread(target=self.send_progress) 
+            t.start()
+
             for result in results:
                 try:
                     result.get()
@@ -237,6 +249,10 @@ class pinboard:
 
             pool.close()
             pool.join()
+            
+            self.complete = True
+            t.join()
+            self.pipe.close()
 
 
         ### At-end functions
@@ -245,8 +261,13 @@ class pinboard:
             for func in self.at_end_functions.values():
                 func()
 
-        for name, func in self.cached_functions.items():
-            print(name, current_iteration.value)
+    def send_progress(self):
+        while not self.complete:
+            int_dict = {}
+            for key,value in current_iteration.items():
+                int_dict[key] = value.value
+            self.pipe.sendall(pickle.dumps(int_dict))
+            self.pipe.recv(1024)
 
     # @yield_traceback
     def _execute_function(self, func, name):
@@ -292,7 +313,7 @@ class pinboard:
         
         self.targets[func_name] = target(filepath)
         iterations = self.instance_iterations[func.__name__]
-        self.instances[func.__name__][func_name] = deferred_function(func, args, kwargs, iterations=num_iterations)
+        self.instances[func.__name__][func_name] = deferred_function(func, func_name, args, kwargs, iterations=num_iterations)
 
     def add_instances(self, func, instances):
         """
@@ -310,7 +331,7 @@ class pinboard:
         """decorator to add a cached function to be conditionally ran"""
         sig = signature(func)
         if len(sig.parameters) == 1:
-            self.cached_functions[func.__name__] = deferred_function(func, num_iterations=iterations)
+            self.cached_functions[func.__name__] = deferred_function(func, func.__name__, num_iterations=iterations)
             filepath = f'{func.__name__}.h5'
             self.targets[func.__name__] = target(filepath)
         else:
@@ -322,7 +343,7 @@ class pinboard:
 
     def at_end(self, func):
         """decorator to add a function to be executed at the end"""
-        self.at_end_functions[func.__name__] = deferred_function(func)
+        self.at_end_functions[func.__name__] = deferred_function(func, func.__name__)
         return func
 
     def shared(self, class_type):

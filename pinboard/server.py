@@ -2,6 +2,7 @@ import socket
 import pickle
 import sys
 import threading
+from time import sleep
  
 HOST = 'localhost'
 PORT = 6000
@@ -26,6 +27,8 @@ def client_thread(conn):
 
         data = pickle.loads(data)
         print('Received: ', data)
+        conn.send(b'good')
+        sleep(.1)
 
     conn.close()
 
