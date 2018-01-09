@@ -18,7 +18,7 @@ class variables():
 
 ### Slow, sim-only code goes here and relevant data is written to file
 @job.cache
-def sim1():
+def sim1(self):
     """compute the square of x"""
     # shared = job.get_shared()
     # shared.x
@@ -27,7 +27,7 @@ def sim1():
     return {'y': y}
 
 @job.cache
-def sim2():
+def sim2(self):
     """compute the cube of x"""
     z = x**3
     return {'z': z}
@@ -40,7 +40,7 @@ def sim3(self):
         yield {'time_series': z, 'time': i}
 
 @job.cache
-def sim4(param):
+def sim4(self, param):
     """sim depends on parameter"""
     x = np.array([1,2,3])
     return {'y': param*x} 
@@ -50,7 +50,7 @@ job.add_instance(sim4, 'p3', 3)
 job.add_instance(sim4, 'p4', 4)
 
 @job.at_end
-def vis():
+def vis(self):
     """visualize the data"""
     cache = job.load(sim1)
     plt.plot(x, cache.y)

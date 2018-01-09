@@ -312,8 +312,8 @@ class pinboard:
         func_name = f'{func.__name__}-{name}'
         
         self.targets[func_name] = target(filepath)
-        iterations = self.instance_iterations[func.__name__]
-        self.instances[func.__name__][func_name] = deferred_function(func, func_name, args, kwargs, iterations=num_iterations)
+        num_iterations = self.instance_iterations[func.__name__]
+        self.instances[func.__name__][func_name] = deferred_function(func, func_name, args, kwargs, num_iterations=num_iterations)
 
     def add_instances(self, func, instances):
         """
