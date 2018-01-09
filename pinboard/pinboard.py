@@ -193,10 +193,11 @@ class pinboard:
 
         ### execute all items
         with Pool(processes=self.args.processes) as pool:
-            for name, func in functions_to_execute.items():
-                pool.apply_async(self._execute_function, (func,name))
+            # for name, func in functions_to_execute.items():
+                # pool.apply_async(self._execute_function, (func,name))
 
-            # results = [pool.apply_async(self._execute_function, (func,name)) for name,func in functions_to_execute.items()]
+
+            results = [pool.apply_async(self._execute_function, (func,name)) for name,func in functions_to_execute.items()]
             # while results:
                 # for result in results:
                     # if result.ready():
@@ -205,6 +206,8 @@ class pinboard:
                     # else:
                         # print('progress')
                 # sleep(.1)
+            for result in results:
+                result.get()
             pool.close()
             pool.join()
 
