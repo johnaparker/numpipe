@@ -143,7 +143,7 @@ class pinboard:
         address = ('localhost', 6000)
         self.pipe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.pipe.connect(address)
-        self.pipe.sendall(pickle.dumps(['batch', 'ID']))
+        self.pipe.sendall(pickle.dumps(['new', 'ID']))
 
         self.complete = False
 
@@ -263,11 +263,12 @@ class pinboard:
 
     def send_progress(self):
         while not self.complete:
+            self.pipe.recv(1024)
             int_dict = {}
             for key,value in current_iteration.items():
                 int_dict[key] = value.value
             self.pipe.sendall(pickle.dumps(int_dict))
-            self.pipe.recv(1024)
+        # self.pipe.sendall(b'all cache functions completed')
 
     # @yield_traceback
     def _execute_function(self, func, name):
