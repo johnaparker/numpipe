@@ -41,12 +41,13 @@ progress = {}
 
 def get_progress_thread(conn, idx):
     print('thread created')
+    conn.send(b'ready')
 
     while conn:
         data = conn.recv(1024)
         print('sending data')
         update_progress()
-        conn.sendall(pickle.dumps(['trash']))
+        conn.sendall(pickle.dumps(progress))
 
     print('closing connection')
     conn.close()
@@ -57,7 +58,7 @@ def update_progress():
     for idx,conn in children.items():
         if conn:
             conn.sendall(b'ready')
-            data = conn.recv(1024)
+            data = conn.recv(100024)
             data = pickle.loads(data)
             progress[idx].update(data)
     print('progress updated!')

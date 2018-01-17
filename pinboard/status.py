@@ -9,6 +9,7 @@ conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 conn.connect(address)
 
 conn.sendall(pickle.dumps(['get', 'ID']))
+conn.recv(1024)
 while True:
     conn.sendall(b'ready')
     progress = pickle.loads(conn.recv(1024))

@@ -264,6 +264,7 @@ class pinboard:
     def send_progress(self):
         while not self.complete:
             self.pipe.recv(1024)
+            print('received')
             int_dict = {}
             for key,value in current_iteration.items():
                 int_dict[key] = value.value
