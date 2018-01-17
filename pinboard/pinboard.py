@@ -8,6 +8,7 @@ import os
 import sys
 import types
 from pinboard.h5cache import h5cache
+from pinboard.networking import recv_msg,send_msg
 from inspect import signature
 import multiprocessing
 from multiprocessing import Pool, Value
@@ -143,7 +144,7 @@ class pinboard:
         address = ('localhost', 6000)
         self.pipe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.pipe.connect(address)
-        self.pipe.sendall(pickle.dumps(['new', 'ID']))
+        send_msg(self.pipe, pickle.dumps(['new', 'ID']))
 
         self.complete = False
 
@@ -238,7 +239,7 @@ class pinboard:
                         # print('progress')
                 # sleep(.1)
 
-            t = threading.Thread(target=self.send_progress) 
+            t = threading.Thread(target=self.listening_thread) 
             t.start()
 
             for result in results:
@@ -251,6 +252,7 @@ class pinboard:
             pool.join()
             
             self.complete = True
+            
             t.join()
             self.pipe.close()
 
@@ -261,15 +263,22 @@ class pinboard:
             for func in self.at_end_functions.values():
                 func()
 
-    def send_progress(self):
+    def listening_thread(self):
         while not self.complete:
-            self.pipe.recv(1024)
+            print('waiting...')
+            request = recv_msg(self.pipe)
             print('received')
-            int_dict = {}
-            for key,value in current_iteration.items():
-                int_dict[key] = value.value
-            self.pipe.sendall(pickle.dumps(int_dict))
-        # self.pipe.sendall(b'all cache functions completed')
+
+            if request == 'abort':
+                return
+
+            if request == 'progress':
+                int_dict = {}
+                for key,value in current_iteration.items():
+                    int_dict[key] = value.value
+                # acquire lock on pipe
+                send_msg(self.pipe, pickle.dumps(int_dict))
+                print('progress sent')
 
     # @yield_traceback
     def _execute_function(self, func, name):

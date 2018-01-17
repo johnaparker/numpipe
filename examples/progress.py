@@ -5,7 +5,7 @@ from time import sleep
 job = pinboard()
 
 N = 100
-T = 30
+T = 15
 
 @job.cache(iterations=N)
 def progress(self):
@@ -13,7 +13,7 @@ def progress(self):
 
     for i in self.iterations():
         sleep(T/N)
-        # print(self.current_iteration)
+        print(i)
 
     return {}
 
