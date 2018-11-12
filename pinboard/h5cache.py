@@ -1,6 +1,19 @@
 import h5py
 import numpy as np
 
+def auto_chunk_size(size_record):
+    """
+    Determine the optimal choice for number of chunks given the size of a record in bytes
+    """
+    if size_record > 1e7:
+        return 1
+    elif size_record > 1e6:
+        return 10
+    elif size_record > 1e4:
+        return 100
+    else:
+        return 1000
+
 def write_over(group, name, data):
     """
     Write over group[data] if it exists, otherwise create it
@@ -31,18 +44,22 @@ def strformat_to_bytes(strformat):
     return amount*suffixes[suffix]
 
 class npcache:
-    def __init__(self, shape, dtype, size=1000):
+    def __init__(self, shape, dtype, size='100M'):
         """
-        Cache a numpy array
+        Cache for a numpy array
 
         Arguments:
             shape       size of numpy array
             dtype       array datatype
-            size        number of records to be cached
+            size        cache memory size
         """
-        cache_shape = (size,) + shape
+        size_bytes = strformat_to_bytes(size)
+        size_dtype = np.dtype(dtype).itemsize
+        self.size_record = size_dtype*np.prod(shape)
+        self.records = int(max(1, size_bytes // self.size_record))
 
-        self.size = size
+        cache_shape = (self.records,) + shape
+
         self.current_record = 0
         self.shape = shape
         self.cache = np.zeros(cache_shape, dtype=dtype)
@@ -50,59 +67,69 @@ class npcache:
     def add(self, record):
         """add a record to the cache"""
         # require shape(record) == self.shape
+        if self.is_full():
+            raise RuntimeError('the cache is full and needs to be cleared')
+            
         self.cache[self.current_record] = record
         self.current_record += 1
 
     def is_full(self):
         """return true if the cache is full"""
-        return self.current_record == self.size
+        return self.current_record == self.records
 
     def clear(self):
         """empty the cache (cached data will be overwritten in future adds)"""
         self.current_record = 0
 
 
-def npcache_from(record, cache_size=1000):
+def npcache_from(record, size='100M', cache_initial=True):
     """
-    Create an npcache from a record
+    Create an npcache from a record (np.array)
     
     Arguments:
         record       numpy array or scalar
-        cache_size   size of record cache (default: 1000)
+        size         cache memory size
+        cache_initial  If True, cache the record passed in (default: True)
     """
     if isinstance(record, np.ndarray):
-        cache = npcache(record.shape, record.dtype, cache_size)
+        cache = npcache(record.shape, record.dtype, size)
     else:
         dtype = type(record)
-        cache = npcache((), dtype, cache_size)
+        cache = npcache((), dtype, size)
 
-    cache.add(record) 
+    if cache_initial:
+        cache.add(record) 
+
     return cache
 
 class h5cache:
-    def __init__(self, filepath, group, name, record, chunk_size=1000, cache_size=1000):
+    def __init__(self, filepath, name, shape, dtype, group='/', chunk_size=None, cache_size='100M'):
         """
         npcache with automatic output to hdf5 file
 
         Arguments:
             filepath     filepath to h5 file
-            group        name of group in h5 file
             name         name of dataset inside group
-            record       first record to write to dataset (numpy array or scalar)
-            chunk_size   size of h5 chunks (default: 1000)
-            cache_size   size of record cache (default: 1000)
+            shape        record shape
+            dtype        record datatype
+            group        name of group in h5 file
+            chunk_size   size of h5 chunks (default: attempts to choose best)
+            cache_size   cache memory size
         """
         self.filepath = filepath
         self.group = group
         self.name = name
         self.h5path = f'{group}/{name}'
-        self.chunk_size = chunk_size
         self.cache_size = cache_size
+        self.npcache = npcache(shape, dtype, cache_size)
+
+        if chunk_size is None:
+            self.chunk_size = auto_chunk_size(self.npcache.size_record)
+        else:
+            self.chunk_size = chunk_size
+
 
         with h5py.File(self.filepath, 'a') as f:
-            self.npcache = npcache_from(record, cache_size)
-            dtype = self.npcache.cache.dtype
-            shape = self.npcache.shape
             dset = f.create_dataset(self.h5path, shape=(0,) + shape, chunks=(self.chunk_size,) + shape, maxshape=(None,) + shape, dtype=dtype)
 
     def add(self, record):
@@ -126,3 +153,30 @@ class h5cache:
             dset[-self.npcache.current_record:] = self.npcache.cache[:self.npcache.current_record]
         self.npcache.clear()
 
+def h5cache_from(record, filepath, name, group='/', chunk_size=None, cache_size='100M', cache_initial=True):
+    """
+    Create an h5cache from a record
+
+    Arguments:
+        record       record (np.array)
+        filepath     filepath to h5 file
+        name         name of dataset inside group
+        group        name of group in h5 file
+        chunk_size   size of h5 chunks (default: 1000)
+        cache_size   cache memory size
+        cache_initial    If True, cache the initial record (default: True)
+    """
+
+    if isinstance(record, np.ndarray):
+        shape = record.shape
+        dtype = record.dtype
+    else:
+        shape = ()
+        dtype = type(record)
+
+    cache = h5cache(filepath, name, shape, dtype, group, chunk_size, cache_size)
+
+    if cache_initial:
+        cache.add(record)
+
+    return cache

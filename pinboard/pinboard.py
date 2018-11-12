@@ -7,7 +7,7 @@ import h5py
 import os
 import sys
 import types
-from pinboard.h5cache import h5cache
+from pinboard.h5cache import h5cache_from
 from pinboard.networking import recv_msg,send_msg
 from inspect import signature
 import multiprocessing
@@ -286,9 +286,6 @@ class pinboard:
     # @yield_traceback
     def _execute_function(self, func, name):
         try:
-            cache_size = 1000
-            chunk_size = 1000
-
             print(f"Running cached function '{name}'")
             symbols = func()
 
@@ -298,7 +295,7 @@ class pinboard:
                 caches = {}
                 next_symbols = next(symbols)
                 for symbol_name, next_symbol in next_symbols.items():
-                    caches[symbol_name] = h5cache(self.targets[name].filepath, '', symbol_name, next_symbol, chunk_size, cache_size)
+                    caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name)
 
                 ### iterate over the remaining symbols, caching each one
                 for next_symbols in symbols:

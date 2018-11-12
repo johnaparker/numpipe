@@ -1,21 +1,22 @@
 from pinboard import pinboard
 from time import sleep
+from tqdm import tqdm
 
 ### Setup
 job = pinboard()
 
-N = 100
-T = 15
+import numpy as np
+x = np.zeros([1000, 1000], dtype=float)
+N = 10
+T = 5
 
 @job.cache(iterations=N)
 def progress(self):
     progress = 0
 
-    for i in self.iterations():
+    for i in tqdm(self.iterations()):
         sleep(T/N)
-        print(i)
-
-    return {}
+        yield dict(counter=x)
 
 ### execute
 job.execute()
