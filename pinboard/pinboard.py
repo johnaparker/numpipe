@@ -19,6 +19,7 @@ from functools import wraps
 import socket
 import pickle
 
+USE_SERVER = False
 
 def doublewrap(f):
     """
@@ -142,9 +143,10 @@ class pinboard:
         self.instance_iterations = {}
 
         address = ('localhost', 6000)
-        self.pipe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.pipe.connect(address)
-        send_msg(self.pipe, pickle.dumps(['new', 'ID']))
+        if USE_SERVER:
+            self.pipe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.pipe.connect(address)
+            send_msg(self.pipe, pickle.dumps(['new', 'ID']))
 
         self.complete = False
 
@@ -239,8 +241,9 @@ class pinboard:
                         # print('progress')
                 # sleep(.1)
 
-            t = threading.Thread(target=self.listening_thread) 
-            t.start()
+            if USE_SERVER:
+                t = threading.Thread(target=self.listening_thread) 
+                t.start()
 
             for result in results:
                 try:
@@ -253,9 +256,9 @@ class pinboard:
             
             self.complete = True
             
-            t.join()
-            self.pipe.close()
-
+            if USE_SERVER:
+                t.join()
+                self.pipe.close()
 
         ### At-end functions
         if self.at_end_functions:
