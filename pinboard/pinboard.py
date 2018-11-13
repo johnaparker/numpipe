@@ -103,7 +103,8 @@ class deferred_function:
         self.arg = first_argument(name, num_iterations=num_iterations)
 
     def __call__(self):
-        return self.function(self.arg, *self.args, **self.kwargs)
+        # return self.function(self.arg, *self.args, **self.kwargs)
+        return self.function(*self.args, **self.kwargs)
 
 class target:
     """
@@ -341,7 +342,7 @@ class pinboard:
     def cache(self, func, iterations=None):
         """decorator to add a cached function to be conditionally ran"""
         sig = signature(func)
-        if len(sig.parameters) == 1:
+        if len(sig.parameters) == 0:
             self.cached_functions[func.__name__] = deferred_function(func, func.__name__, num_iterations=iterations)
             filepath = f'{func.__name__}.h5'
             self.targets[func.__name__] = target(filepath)
