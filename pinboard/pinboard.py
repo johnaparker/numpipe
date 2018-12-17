@@ -18,6 +18,7 @@ from time import sleep
 from functools import wraps
 import socket
 import pickle
+import numpy as np
 
 USE_SERVER = False
 
@@ -104,6 +105,7 @@ class deferred_function:
 
     def __call__(self):
         # return self.function(self.arg, *self.args, **self.kwargs)
+        np.random.seed(int.from_bytes(os.urandom(4), byteorder='little'))
         return self.function(*self.args, **self.kwargs)
 
 class target:
