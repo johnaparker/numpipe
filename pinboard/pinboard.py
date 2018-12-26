@@ -53,6 +53,9 @@ class Bunch:
     def __init__(self, adict):
         self.__dict__.update(adict)
 
+    def __getitem__(self, key):
+        return self.__dict__[key]
+
 def load_symbols(filepath):
     """Load all symbols from h5 filepath"""
 
