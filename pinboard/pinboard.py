@@ -155,9 +155,10 @@ class pinboard:
         if dirpath is None:
             self.dirpath = sys.path[0]
         else:
-            if dirpath[0] not in ('/', '~'):
+            if dirpath[0] not in ('/', '~', '$'):
                 self.dirpath = os.path.join(sys.path[0], dirpath)
             self.dirpath = os.path.expanduser(self.dirpath)
+            self.dirpath = os.path.expandvars(self.dirpath)
             pathlib.Path(self.dirpath).mkdir(parents=False, exist_ok=True) 
 
         address = ('localhost', 6000)
