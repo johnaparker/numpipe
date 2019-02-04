@@ -6,6 +6,7 @@ import argparse
 import h5py
 import os
 import sys
+import pathlib
 import types
 from pinboard.h5cache import h5cache_from
 from pinboard.networking import recv_msg,send_msg
@@ -140,13 +141,22 @@ class target:
 class pinboard:
     """Deferred function evaluation and access to cached function output"""
 
-    def __init__(self):
+    def __init__(self, dirpath=None):
         self.cached_functions = {}
         self.at_end_functions = {}
         self.targets = {}
         self.instances = {}
         self.instance_functions = {}
         self.instance_iterations = {}
+
+        self.dirpath = dirpath
+        if dirpath is None:
+            self.dirpath = sys.path[0]
+        else:
+            if dirpath[0] not in ('/', '~'):
+                self.dirpath = os.path.join(sys.path[0], dirpath)
+            self.dirpath = os.path.expanduser(self.dirpath)
+            pathlib.Path(self.dirpath).mkdir(parents=False, exist_ok=True) 
 
         address = ('localhost', 6000)
         if USE_SERVER:
@@ -325,8 +335,8 @@ class pinboard:
         """
         Add an instance (a function with specified args and kwargs)
         """
-        filepath = f'{func.__name__}-{name}.h5'
         func_name = f'{func.__name__}-{name}'
+        filepath = f'{self.dirpath}/{func_name}.h5'
         
         self.targets[func_name] = target(filepath)
         num_iterations = self.instance_iterations[func.__name__]
@@ -349,7 +359,7 @@ class pinboard:
         sig = signature(func)
         if len(sig.parameters) == 0:
             self.cached_functions[func.__name__] = deferred_function(func, func.__name__, num_iterations=iterations)
-            filepath = f'{func.__name__}.h5'
+            filepath = f'{self.dirpath}/{func.__name__}.h5'
             self.targets[func.__name__] = target(filepath)
         else:
             self.instances[func.__name__] = {}
