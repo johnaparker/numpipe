@@ -34,9 +34,9 @@ def sim4(param):
     x = np.array([1,2,3])
     return {'y': param*x} 
 
-job.add_instance(sim4, 'p2', 2)
-job.add_instance(sim4, 'p3', 3)
-job.add_instance(sim4, 'p4', 4)
+job.add_instance(sim4, param=2)
+job.add_instance(sim4, param=3)
+job.add_instance(sim4, param=4)
 
 @job.at_end
 def vis():
@@ -46,7 +46,7 @@ def vis():
     cache = job.load(sim2)
     plt.plot(x, cache.z)
 
-    cache = job.load(sim4, 'p2')
+    cache = job.load(sim4, 2)
     # with job.load(sim4, defer=True) as cache:
     plt.show()
 

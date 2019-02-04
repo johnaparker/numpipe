@@ -143,12 +143,13 @@ class pinboard:
     """Deferred function evaluation and access to cached function output"""
 
     def __init__(self, dirpath=None):
-        self.cached_functions = {}
-        self.at_end_functions = {}
-        self.targets = {}
-        self.instances = {}
-        self.instance_functions = {}
-        self.instance_iterations = {}
+        self.cached_functions = dict()
+        self.at_end_functions = dict()
+        self.targets = dict()
+        self.instances = dict()
+        self.instance_functions = dict()
+        self.instance_iterations = dict()
+        self.instance_counts = dict() 
 
         self.dirpath = dirpath
         if dirpath is None:
@@ -348,16 +349,21 @@ class pinboard:
         except:
             raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
-    def add_instance(self, func, name, *args, **kwargs):
+    # @static_vars(counter=0)
+    def add_instance(self, func, instance_name=None, **kwargs):
         """
-        Add an instance (a function with specified args and kwargs)
+        Add an instance (a function with specified kwargs)
         """
-        func_name = f'{func.__name__}-{name}'
+        if instance_name is None:
+            instance_name = str(self.instance_counts[func.__name__])
+            self.instance_counts[func.__name__] += 1
+
+        func_name = f'{func.__name__}-{instance_name}'
         filepath = f'{self.dirpath}/{func_name}.h5'
         
         self.targets[func_name] = target(filepath)
         num_iterations = self.instance_iterations[func.__name__]
-        self.instances[func.__name__][func_name] = deferred_function(func, func_name, args, kwargs, num_iterations=num_iterations)
+        self.instances[func.__name__][func_name] = deferred_function(func, func_name, kwargs=kwargs, num_iterations=num_iterations)
 
     def add_instances(self, func, instances):
         """
@@ -382,6 +388,7 @@ class pinboard:
             self.instances[func.__name__] = {}
             self.instance_functions[func.__name__] = func
             self.instance_iterations[func.__name__] = iterations
+            self.instance_counts[func.__name__] = 0
 
         return func
 
