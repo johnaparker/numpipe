@@ -20,6 +20,7 @@ from functools import wraps
 import socket
 import pickle
 import numpy as np
+from mpi4py import MPI
 
 USE_SERVER = False
 
@@ -165,6 +166,7 @@ class pinboard:
             send_msg(self.pipe, pickle.dumps(['new', 'ID']))
 
         self.complete = False
+        self.rank = MPI.COMM_WORLD.Get_rank()
 
     #TODO implement load all, jdefer
     def load(self, function=None, instance=None, defer=False):
@@ -239,7 +241,15 @@ class pinboard:
                     except KeyError:
                         raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
 
-        self._request_to_overwrite(names=functions_to_execute.keys())
+        aborting = False
+        if self.rank == 0:
+            overwriten = self._overwrite(names=functions_to_execute.keys())
+            if not overwriten:
+                aborting = True
+                print('Aborting...')
+        aborting = MPI.COMM_WORLD.bcast(aborting, root=0)
+        if aborting:
+            sys.exit(0)
 
         ### execute all items
         with Pool(processes=self.args.processes) as pool:
@@ -277,10 +287,11 @@ class pinboard:
                 self.pipe.close()
 
         ### At-end functions
-        if self.at_end_functions and not self.args.no_at_end:
-            print("Running at-end functions")
-            for func in self.at_end_functions.values():
-                func()
+        if self.rank == 0:
+            if self.at_end_functions and not self.args.no_at_end:
+                print("Running at-end functions")
+                for func in self.at_end_functions.values():
+                    func()
 
     def listening_thread(self):
         while not self.complete:
@@ -302,25 +313,31 @@ class pinboard:
     # @yield_traceback
     def _execute_function(self, func, name):
         try:
-            print(f"Running cached function '{name}'")
+            if self.rank == 0:
+                print(f"Running cached function '{name}'")
+            MPI.COMM_WORLD.Barrier()
             symbols = func()
 
             ### Generator functions
             if isinstance(symbols, types.GeneratorType):
                 ### create all the caches based on the first set of symbols
-                caches = {}
                 next_symbols = next(symbols)
-                for symbol_name, next_symbol in next_symbols.items():
-                    caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name)
+
+                if self.rank == 0:
+                    caches = {}
+                    for symbol_name, next_symbol in next_symbols.items():
+                        caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name)
 
                 ### iterate over the remaining symbols, caching each one
                 for next_symbols in symbols:
-                    for symbol_name, next_symbol in next_symbols.items():
-                        caches[symbol_name].add(next_symbol)
+                    if self.rank == 0:
+                        for symbol_name, next_symbol in next_symbols.items():
+                            caches[symbol_name].add(next_symbol)
 
                 ### empty any of the remaining cache
-                for cache in caches.values():
-                    cache.flush()
+                if self.rank == 0:
+                    for cache in caches.values():
+                        cache.flush()
 
             ### Standard Functions
             else:
@@ -378,6 +395,9 @@ class pinboard:
         return class_type
 
     def display_functions(self):
+        if not self.rank == 0:
+            return
+
         print("cached functions:")
         for name,func in self.cached_functions.items():
             print('\t', name, ' -- ', func.__doc__, sep='')
@@ -396,14 +416,20 @@ class pinboard:
 
     def _write_symbols(self, name, symbols):
         """write symbols to cache inside group"""
+        if not self.rank == 0:
+            return
+
         self.targets[name].write(symbols)
 
-    def _request_to_overwrite(self, names):
+    def _overwrite(self, names):
         """Request if existing hdf5 file should be overwriten
 
            Argumnets: 
                names        list of group names to check
         """
+        if not self.rank == 0:
+            return
+
         data_to_delete = []
         
         if names:
@@ -419,10 +445,12 @@ class pinboard:
                 delete = input(f"Continue with job? (y/n) ")
 
                 if delete != 'y':
-                    sys.exit('Aborting...')
+                    return False
 
             for data in data_to_delete:
                 self.targets[data].remove()
+
+        return True
 
     def _run_parser(self):
         """parse user request"""
