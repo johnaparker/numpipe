@@ -181,14 +181,19 @@ class pinboard:
             defer        If True, defer loading
         """
 
-        target_name = function.__name__
+        func_name = function.__name__
 
         if function.__name__ in self.instance_functions.keys():
             if instance is None:
-                #load all instances
-                pass
+                def load_next():
+                    for target_name in self.instances[func_name].keys():
+                        # target_name = f'{func_name}-{instance_name}'
+                        yield (target_name, self.targets[target_name].load())
+                return load_next()
             else:
-                target_name += f'-{instance}'
+                target_name = f'{func_name}-{instance}'
+        else:
+            target_name = func_name
 
         return self.targets[target_name].load()
 

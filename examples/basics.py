@@ -47,6 +47,8 @@ def vis():
     plt.plot(x, cache.z)
 
     cache = job.load(sim4, 2)
+    for name, cache in job.load(sim4):
+        print(f'{name} instance has y = {cache.y}')
     # with job.load(sim4, defer=True) as cache:
     plt.show()
 
