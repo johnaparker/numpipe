@@ -8,39 +8,28 @@ job = pinboard()
 ### Fast, shared code goes here
 x = np.linspace(0,1,10)
 
-@job.shared
-class variables():
-    def __init__(self):
-        self.x = np.linspace(0,1,10)
-
-    def writer(self):
-        pass
-
 ### Slow, sim-only code goes here and relevant data is written to file
 @job.cache
-def sim1(self):
+def sim1():
     """compute the square of x"""
-    # shared = job.get_shared()
-    # shared.x
-
     y = x**2
     return {'y': y}
 
 @job.cache
-def sim2(self):
+def sim2():
     """compute the cube of x"""
     z = x**3
     return {'z': z}
 
-@job.cache(iterations=5)
-def sim3(self):
+@job.cache
+def sim3():
     """construct a time-series"""
-    for i in self.iterations():
+    for i in range(5):
         z = x*i + 1
         yield {'time_series': z, 'time': i}
 
 @job.cache
-def sim4(self, param):
+def sim4(param):
     """sim depends on parameter"""
     x = np.array([1,2,3])
     return {'y': param*x} 
@@ -50,7 +39,7 @@ job.add_instance(sim4, 'p3', 3)
 job.add_instance(sim4, 'p4', 4)
 
 @job.at_end
-def vis(self):
+def vis():
     """visualize the data"""
     cache = job.load(sim1)
     plt.plot(x, cache.y)
@@ -62,4 +51,4 @@ def vis(self):
     plt.show()
 
 ### execute
-job.execute(store={'x': x})
+job.execute()

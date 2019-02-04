@@ -267,7 +267,7 @@ class pinboard:
                 self.pipe.close()
 
         ### At-end functions
-        if self.at_end_functions:
+        if self.at_end_functions and not self.args.no_at_end:
             print("Running at-end functions")
             for func in self.at_end_functions.values():
                 func()
@@ -419,6 +419,7 @@ class pinboard:
         parser = argparse.ArgumentParser()
         parser.add_argument('-r', '--rerun', nargs='*', type=str, default=None, help='re-run specific cached functions by name')
         parser.add_argument('-f', '--force', action='store_true', help='force over-write any existing cached data')
+        parser.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
         parser.add_argument('-np', '--processes', type=int, default=1, help='number of processes to use in parallel execution')
 
         subparsers = parser.add_subparsers(dest="action")
