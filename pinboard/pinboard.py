@@ -339,7 +339,10 @@ class pinboard:
                 for next_symbols in symbols:
                     if self.rank == 0:
                         for symbol_name, next_symbol in next_symbols.items():
-                            caches[symbol_name].add(next_symbol)
+                            if symbol_name not in caches:
+                                caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name)
+                            else:
+                                caches[symbol_name].add(next_symbol)
 
                 ### empty any of the remaining cache
                 if self.rank == 0:
