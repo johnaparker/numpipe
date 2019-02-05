@@ -161,6 +161,8 @@ class pinboard:
             self.dirpath = os.path.expandvars(self.dirpath)
             pathlib.Path(self.dirpath).mkdir(parents=False, exist_ok=True) 
 
+        self.filename = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+
         address = ('localhost', 6000)
         if USE_SERVER:
             self.pipe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -183,7 +185,7 @@ class pinboard:
 
         func_name = function.__name__
 
-        if function.__name__ in self.instance_functions.keys():
+        if func_name in self.instance_functions.keys():
             if instance is None:
                 def load_next():
                     for target_name in self.instances[func_name].keys():
@@ -371,7 +373,7 @@ class pinboard:
             self.instance_counts[func.__name__] += 1
 
         func_name = f'{func.__name__}-{instance_name}'
-        filepath = f'{self.dirpath}/{func_name}.h5'
+        filepath = f'{self.dirpath}/{self.filename}-{func_name}.h5'
         
         self.targets[func_name] = target(filepath)
         num_iterations = self.instance_iterations[func.__name__]
@@ -394,7 +396,7 @@ class pinboard:
         sig = signature(func)
         if len(sig.parameters) == 0:
             self.cached_functions[func.__name__] = deferred_function(func, func.__name__, num_iterations=iterations)
-            filepath = f'{self.dirpath}/{func.__name__}.h5'
+            filepath = f'{self.dirpath}/{self.filename}-{func.__name__}.h5'
             self.targets[func.__name__] = target(filepath)
         else:
             self.instances[func.__name__] = {}
