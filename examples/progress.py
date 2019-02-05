@@ -6,17 +6,19 @@ from tqdm import tqdm
 job = pinboard()
 
 import numpy as np
-x = np.zeros([1000, 1000], dtype=float)
-N = 10
+N = 100
 T = 5
 
-@job.cache(iterations=N)
-def progress(self):
+@job.cache
+def progress(i):
     progress = 0
 
-    for i in tqdm(self.iterations()):
+    for i in tqdm(range(N), position=i, desc=f'job {i}'):
         sleep(T/N)
-        yield dict(counter=x)
+        yield dict()
+
+for i in range(10):
+    job.add_instance(progress, i=i)
 
 ### execute
 job.execute()

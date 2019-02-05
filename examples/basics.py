@@ -34,6 +34,10 @@ def sim4(param):
     x = np.array([1,2,3])
     return {'y': param*x} 
 
+@job.cache
+def sim5():
+    pass
+
 job.add_instance(sim4, param=2)
 job.add_instance(sim4, param=3)
 job.add_instance(sim4, param=4)

@@ -348,10 +348,13 @@ class pinboard:
 
             ### Standard Functions
             else:
-                if not isinstance(symbols, dict):
+                if isinstance(symbols, dict):
+                    self._write_symbols(name, symbols)
+                elif symbols is None:
+                    self._write_symbols(name, dict())
+                else:
                     raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
 
-                self._write_symbols(name, symbols)
         except:
             raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
