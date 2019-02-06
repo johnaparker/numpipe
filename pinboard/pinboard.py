@@ -214,6 +214,33 @@ class pinboard:
             self.display_functions()
             return
 
+        ### determine which cahced data to delete
+        functions_to_delete = dict()
+        if self.args.delete is not None:
+            if len(self.args.delete) == 0:
+                functions_to_delete.update(self.cached_functions)
+                for instances in self.instances.values():
+                    functions_to_delete.update(instances)
+            else:
+                for name in self.args.delete:
+                    if name in self.cached_functions.keys():
+                        functions_to_delete[name] = self.cached_functions[name]
+                    elif name in self.instances.keys():
+                        functions_to_delete.update(self.instances[name])
+                    else:
+                        try:
+                            base = name.split('-')[0]
+                            functions_to_delete[name] = self.instances[base][name]
+                        except KeyError:
+                            raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
+
+            if self.rank == 0:
+                overwriten = self._overwrite(names=functions_to_delete.keys())
+                if not overwriten:
+                    print('Aborting...')
+
+            return
+
         ### write store to file
         if store is not None:
             with h5py.File('store.h5', 'w') as f:
@@ -221,7 +248,7 @@ class pinboard:
                     f[name] = value
 
         ### determine which functions to execute based on file and command line
-        functions_to_execute = {}
+        functions_to_execute = dict()
         if self.args.rerun is None:
             for name,func in self.cached_functions.items():
                 if not self.targets[name].exists():
@@ -258,7 +285,7 @@ class pinboard:
                 print('Aborting...')
         aborting = MPI.COMM_WORLD.bcast(aborting, root=0)
         if aborting:
-            sys.exit(0)
+            return
 
         ### execute all items
         with Pool(processes=self.args.processes) as pool:
@@ -478,6 +505,7 @@ class pinboard:
         parser = argparse.ArgumentParser()
         parser.add_argument('-r', '--rerun', nargs='*', type=str, default=None, help='re-run specific cached functions by name')
         parser.add_argument('-f', '--force', action='store_true', help='force over-write any existing cached data')
+        parser.add_argument('-d', '--delete', nargs='*', type=str, default=None, help='delete specified cached data')
         parser.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
         parser.add_argument('-np', '--processes', type=int, default=1, help='number of processes to use in parallel execution')
 
