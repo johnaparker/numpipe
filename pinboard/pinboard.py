@@ -10,6 +10,7 @@ import pathlib
 import types
 from pinboard.h5cache import h5cache_from
 from pinboard.networking import recv_msg,send_msg
+from pinboard import slurm
 from inspect import signature
 import multiprocessing
 from multiprocessing import Pool, Value
@@ -21,6 +22,8 @@ import socket
 import pickle
 import numpy as np
 from mpi4py import MPI
+import subprocess
+from termcolor import colored
 
 USE_SERVER = False
 
@@ -291,6 +294,31 @@ class pinboard:
         if aborting:
             return
 
+        if self.args.action == 'slurm':
+            ntasks = len(functions_to_execute)
+            # slurm.create_lookup(self.filename, functions_to_execute.keys())
+            sbatch_filename = slurm.create_sbatch(self.filename, functions_to_execute.keys(), 
+                    time=self.args.time, memory=self.args.memory)
+
+            wall_time = slurm.wall_time(self.args.time)
+            print(colored('sbatch file', color='yellow', attrs=['bold']))
+            subprocess.run(['cat',  f'{sbatch_filename}'])
+            print(colored('\nSlurm job', color='yellow', attrs=['bold']))
+            print('    Number of tasks:', colored(f'{ntasks}', attrs=['bold']))
+            print('    Max wall-time:', colored(f'{wall_time:.2f} hours', attrs=['bold']))
+            print('    Max CPU-hour usage:', colored(f'{ntasks*wall_time:.2f} hours', attrs=['bold']))
+
+            if not self.args.no_submit:
+                submit_job = input(colored('\nSubmit Slurm job? (y/n) ', color='yellow', attrs=['bold']))
+                if submit_job != 'y':
+                    print('Not submitting Slurm job')
+                    return 
+
+                subprocess.run(['sbatch', sbatch_filename])
+                print('Slurm job submitted')
+
+            return
+
         ### execute all items
         with Pool(processes=self.args.processes) as pool:
             # for name, func in functions_to_execute.items():
@@ -504,13 +532,22 @@ class pinboard:
     def _run_parser(self):
         """parse user request"""
         parser = argparse.ArgumentParser()
-        parser.add_argument('-r', '--rerun', nargs='*', type=str, default=None, help='re-run specific cached functions by name')
-        parser.add_argument('-f', '--force', action='store_true', help='force over-write any existing cached data')
-        parser.add_argument('-d', '--delete', nargs='*', type=str, default=None, help='delete specified cached data')
-        parser.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
-        parser.add_argument('-np', '--processes', type=int, default=1, help='number of processes to use in parallel execution')
 
         subparsers = parser.add_subparsers(dest="action")
         display_parser = subparsers.add_parser('display', help='display available functions and descriptions')
+        slurm_parse = subparsers.add_parser('slurm', help='run on a system with the Slurm Workload Manager')
+
+        for p in [parser, slurm_parse]:
+            p.add_argument('-r', '--rerun', nargs='*', type=str, default=None, help='re-run specific cached functions by name')
+            p.add_argument('-f', '--force', action='store_true', help='force over-write any existing cached data')
+            p.add_argument('-d', '--delete', nargs='*', type=str, default=None, help='delete specified cached data')
+            p.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
+            p.add_argument('-np', '--processes', type=int, default=1, help='number of processes to use in parallel execution')
+
+
+        slurm_parse.add_argument('-t', '--time', type=str, default='36', help='maximum run-time for the Slurm job, formated as {hours}:{minutes}:{seconds} (minutes and seconds optional)')
+        slurm_parse.add_argument('-m', '--memory', type=float, default=2, help='maximum memory per cpu for the Slurm job in GB')
+        slurm_parse.add_argument('--batch', action='store_true', help='submit the Slurm job in batches')
+        slurm_parse.add_argument('--no-submit', action='store_true', help="don't submit the Slurm job after creating sbatch files")
 
         self.args = parser.parse_args()
