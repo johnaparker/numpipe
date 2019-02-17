@@ -1,4 +1,4 @@
-from pinboard import pinboard
+from pinboard import pinboard, once
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -28,7 +28,7 @@ def sim3():
         z = x*i + 1
         yield {'time_series': z, 'time': i}
 
-    yield dict(xavg=np.average(x))
+    yield once(xavg=np.average(x))
 
 @job.cache
 def sim4(param):

@@ -24,6 +24,10 @@ from mpi4py import MPI
 
 USE_SERVER = False
 
+class once(dict):
+    """identical to dict; used to yield something only once"""
+    pass
+
 def doublewrap(f):
     """
     a decorator decorator, allowing the decorator to be used as:
@@ -356,22 +360,19 @@ class pinboard:
 
             ### Generator functions
             if isinstance(symbols, types.GeneratorType):
-                ### create all the caches based on the first set of symbols
-                next_symbols = next(symbols)
+                caches = dict()
 
-                if self.rank == 0:
-                    caches = {}
-                    for symbol_name, next_symbol in next_symbols.items():
-                        caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name)
-
-                ### iterate over the remaining symbols, caching each one
+                ### iterate over all symbols, caching each one
                 for next_symbols in symbols:
                     if self.rank == 0:
-                        for symbol_name, next_symbol in next_symbols.items():
-                            if symbol_name not in caches:
-                                caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name)
-                            else:
-                                caches[symbol_name].add(next_symbol)
+                        if type(next_symbols) is once:
+                            self._write_symbols(name, next_symbols)
+                        else:
+                            for symbol_name, next_symbol in next_symbols.items():
+                                if symbol_name not in caches:
+                                    caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name)
+                                else:
+                                    caches[symbol_name].add(next_symbol)
 
                 ### empty any of the remaining cache
                 if self.rank == 0:
