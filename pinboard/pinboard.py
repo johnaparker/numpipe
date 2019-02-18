@@ -244,7 +244,7 @@ class pinboard:
             if self.rank == 0:
                 overwriten = self._overwrite(names=functions_to_delete.keys())
                 if not overwriten:
-                    print('Aborting...')
+                    print(colored('Aborting...', color='yellow', attrs=['bold']))
 
             return
 
@@ -289,7 +289,7 @@ class pinboard:
             overwriten = self._overwrite(names=functions_to_execute.keys())
             if not overwriten:
                 aborting = True
-                print('Aborting...')
+                print(colored('Aborting...', color='yellow', attrs=['bold']))
         aborting = MPI.COMM_WORLD.bcast(aborting, root=0)
         if aborting:
             return
@@ -311,11 +311,11 @@ class pinboard:
             if not self.args.no_submit:
                 submit_job = input(colored('\nSubmit Slurm job? (y/n) ', color='yellow', attrs=['bold']))
                 if submit_job != 'y':
-                    print('Not submitting Slurm job')
+                    print(colored('\nNot submitting Slurm job', color='yellow', attrs=['bold']))
                     return 
 
                 subprocess.run(['sbatch', sbatch_filename])
-                print('Slurm job submitted')
+                print(colored('\nSlurm job submitted', color='yellow', attrs=['bold']))
 
             return
 
@@ -357,7 +357,7 @@ class pinboard:
         ### At-end functions
         if self.rank == 0:
             if self.at_end_functions and not self.args.no_at_end:
-                print("Running at-end functions")
+                print(colored('Running at-end functions', color='yellow'))
                 for func in self.at_end_functions.values():
                     func()
 
@@ -382,7 +382,7 @@ class pinboard:
     def _execute_function(self, func, name):
         try:
             if self.rank == 0:
-                print(f"Running cached function '{name}'")
+                print(colored(f"Running cached function '{name}'", color='yellow'))
             MPI.COMM_WORLD.Barrier()
             symbols = func()
 
@@ -475,21 +475,21 @@ class pinboard:
         if not self.rank == 0:
             return
 
-        print("cached functions:")
+        print(colored("cached functions:", color='yellow', attrs=['bold']))
         for name,func in self.cached_functions.items():
-            print('\t', name, ' -- ', func.__doc__, sep='')
+            print('    ', colored(name, color='yellow'), ' -- ', func.__doc__, sep='')
 
         for base,instance in self.instances.items():
-            print('\t', base, ' -- ', self.instance_functions[base].__doc__, sep='')
-            print('\t ', f'[{len(instance)} instances] ', end='')
+            print('    ', colored(base, color='yellow'), ' -- ', self.instance_functions[base].__doc__, sep='')
+            print('      ', f'[{len(instance)} instances] ', end='')
             for name, func in instance.items():
                 subname = name.split('-')[1]
                 print(subname, end=' ')
             print('')
 
-        print('\n', "at-end functions:", sep='')
+        print(colored("\nat-end functions:", color='yellow', attrs=['bold']))
         for name,func in self.at_end_functions.items():
-            print('\t', name, ' -- ', func.__doc__, sep='')
+            print('    ', colored(name, color='yellow'), ' -- ', func.__doc__, sep='')
 
     def _write_symbols(self, name, symbols):
         """write symbols to cache inside group"""
@@ -513,13 +513,14 @@ class pinboard:
             data_to_delete.extend(filter(lambda name: self.targets[name].exists(), names))
 
         if data_to_delete:
-            summary = "The following cached data will be deleted:\n"
+            summary = colored("The following cached data will be deleted:\n", color='yellow', attrs=['bold'])
             for data in data_to_delete:
                 summary += self.targets[data].filepath + '\n'
 
             if not self.args.force:
                 print(summary)
-                delete = input(f"Continue with job? (y/n) ")
+                delete = input(colored(f"Continue with job? (y/n) ", color='yellow', attrs=['bold']))
+                print('')
 
                 if delete != 'y':
                     return False
