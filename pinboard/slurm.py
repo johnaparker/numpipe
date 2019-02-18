@@ -86,7 +86,7 @@ def create_sbatch(py_filename, func_names, time='36', memory=2, partition='broad
 #SBATCH --time={time_str}
 #SBATCH --mem-per-cpu={mem_in_mb}
 
-python {py_filename}.py -r {r_flag} --no-at-end > output/{py_filename}.log 2> output/{py_filename}.err
+python {py_filename}.py -r {r_flag} -np {ntasks} --no-at-end > output/{py_filename}.log 2> output/{py_filename}.err
 """
     
     sbatch_filename = f'{py_filename}.sbatch'
