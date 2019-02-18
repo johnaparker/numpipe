@@ -1,28 +1,4 @@
-# def create_lookup(py_filename, func_names):
-    # with open(f'{py_filename}-lookup.txt', 'w') as f:
-        # for func_name in func_names:
-            # f.write(f'{func_name}\n')
-
-# def create_sbatch(py_filename, func_names, hours=36, memory=2, partition='broadwl'):
-    # ntasks = len(func_names)
-    # output = f"""#!/bin/bash                                                                
-
-# #SBATCH --job-name={py_filename}
-# #SBATCH --partition={partition}
-# #SBATCH --ntasks={ntasks}
-# #SBATCH --time={hours}:00:00
-# #SBATCH --mem-per-cpu={memory*1000}
-
-# ulimit -u 10000
-# srun="srun --exclusive -N1 -n1"
-# parallel="parallel --delay .2 -j $SLURM_NTASKS --joblog runtask.log --resume"
-
-# $parallel "$srun python {py_filename}.py -r {1} --no-at-end > output/out_{1}.txt 2> output/out_{1}.err" :::: {py_filename}-lookup.txt
-# """
-    
-    # sbatch_filename = f'{py_filename}.sbatch'
-    # with open(sbatch_filename, 'w') as f:
-        # f.write(output)
+import os
 
 def wall_time(time_str):
     """return the wall-time for a given run-time string (in hours)"""
@@ -78,6 +54,8 @@ def create_sbatch(py_filename, func_names, time='36', memory=2, partition='broad
     mem_in_mb = int(memory*1000)
     time_str = format_time(time)
 
+    os.makedirs('output', exist_ok=True)
+
     output = f"""#!/bin/bash                                                                
 
 #SBATCH --job-name={py_filename}
@@ -94,3 +72,29 @@ python {py_filename}.py -r {r_flag} -np {ntasks} --no-at-end > output/{py_filena
         f.write(output)
 
     return sbatch_filename
+
+# def create_lookup(py_filename, func_names):
+    # with open(f'{py_filename}-lookup.txt', 'w') as f:
+        # for func_name in func_names:
+            # f.write(f'{func_name}\n')
+
+# def create_sbatch(py_filename, func_names, hours=36, memory=2, partition='broadwl'):
+    # ntasks = len(func_names)
+    # output = f"""#!/bin/bash                                                                
+
+# #SBATCH --job-name={py_filename}
+# #SBATCH --partition={partition}
+# #SBATCH --ntasks={ntasks}
+# #SBATCH --time={hours}:00:00
+# #SBATCH --mem-per-cpu={memory*1000}
+
+# ulimit -u 10000
+# srun="srun --exclusive -N1 -n1"
+# parallel="parallel --delay .2 -j $SLURM_NTASKS --joblog runtask.log --resume"
+
+# $parallel "$srun python {py_filename}.py -r {1} --no-at-end > output/out_{1}.txt 2> output/out_{1}.err" :::: {py_filename}-lookup.txt
+# """
+    
+    # sbatch_filename = f'{py_filename}.sbatch'
+    # with open(sbatch_filename, 'w') as f:
+        # f.write(output)
