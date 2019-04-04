@@ -1,5 +1,6 @@
 import h5py
 import numpy as np
+import time
 
 def auto_chunk_size(size_record):
     """
@@ -103,7 +104,7 @@ def npcache_from(record, size='100M', cache_initial=True):
     return cache
 
 class h5cache:
-    def __init__(self, filepath, name, shape, dtype, group='/', chunk_size=None, cache_size='100M'):
+    def __init__(self, filepath, name, shape, dtype, group='/', chunk_size=None, cache_size='100M', cache_time=300):
         """
         npcache with automatic output to hdf5 file
 
@@ -114,13 +115,16 @@ class h5cache:
             dtype        record datatype
             group        name of group in h5 file
             chunk_size   size of h5 chunks (default: attempts to choose best)
-            cache_size   cache memory size
+            cache_size   cache memory size (default: 100 MB)
+            cache_time   time (in seconds) to hold the cache (default: 5 minutes)
         """
         self.filepath = filepath
         self.group = group
         self.name = name
         self.h5path = f'{group}/{name}'
         self.cache_size = cache_size
+        self.cache_time = cache_time
+        self.time_start = time.time()
         self.npcache = npcache(shape, dtype, cache_size)
 
         if chunk_size is None:
@@ -141,6 +145,10 @@ class h5cache:
         """
         if self.npcache.is_full():
             self.flush()
+        elif time.time() - self.time_start > self.cache_time:
+            self.flush()
+            self.time_start = time.time() 
+
         self.npcache.add(record)
 
     def flush(self):
@@ -153,7 +161,7 @@ class h5cache:
             dset[-self.npcache.current_record:] = self.npcache.cache[:self.npcache.current_record]
         self.npcache.clear()
 
-def h5cache_from(record, filepath, name, group='/', chunk_size=None, cache_size='100M', cache_initial=True):
+def h5cache_from(record, filepath, name, group='/', chunk_size=None, cache_size='100M', cache_time=300, cache_initial=True):
     """
     Create an h5cache from a record
 
@@ -164,6 +172,7 @@ def h5cache_from(record, filepath, name, group='/', chunk_size=None, cache_size=
         group        name of group in h5 file
         chunk_size   size of h5 chunks (default: 1000)
         cache_size   cache memory size
+        cache_time   time (in seconds) to hold the cache (default: 5 minutes)
         cache_initial    If True, cache the initial record (default: True)
     """
 
@@ -174,7 +183,7 @@ def h5cache_from(record, filepath, name, group='/', chunk_size=None, cache_size=
         shape = ()
         dtype = type(record)
 
-    cache = h5cache(filepath, name, shape, dtype, group, chunk_size, cache_size)
+    cache = h5cache(filepath, name, shape, dtype, group, chunk_size, cache_size, cache_time)
 
     if cache_initial:
         cache.add(record)

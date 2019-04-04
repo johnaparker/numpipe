@@ -220,139 +220,140 @@ class pinboard:
         if self.args.action == 'display':
             self.display_functions()
             return
+        
+        if not self.args.at_end:
+            ### determine which cahced data to delete
+            functions_to_delete = dict()
+            if self.args.delete is not None:
+                if len(self.args.delete) == 0:
+                    functions_to_delete.update(self.cached_functions)
+                    for instances in self.instances.values():
+                        functions_to_delete.update(instances)
+                else:
+                    for name in self.args.delete:
+                        if name in self.cached_functions.keys():
+                            functions_to_delete[name] = self.cached_functions[name]
+                        elif name in self.instances.keys():
+                            functions_to_delete.update(self.instances[name])
+                        else:
+                            try:
+                                base = name.split('-')[0]
+                                functions_to_delete[name] = self.instances[base][name]
+                            except KeyError:
+                                raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
 
-        ### determine which cahced data to delete
-        functions_to_delete = dict()
-        if self.args.delete is not None:
-            if len(self.args.delete) == 0:
-                functions_to_delete.update(self.cached_functions)
+                if self.rank == 0:
+                    overwriten = self._overwrite(names=functions_to_delete.keys())
+                    if not overwriten:
+                        print(colored('Aborting...', color='yellow', attrs=['bold']))
+
+                return
+
+            ### write store to file
+            if store is not None:
+                with h5py.File('store.h5', 'w') as f:
+                    for name,value in store.items():
+                        f[name] = value
+
+            ### determine which functions to execute based on file and command line
+            functions_to_execute = dict()
+            if self.args.rerun is None:
+                for name,func in self.cached_functions.items():
+                    if not self.targets[name].exists():
+                        functions_to_execute[name] = func
+
+                for base,instances in self.instances.items():
+                    for name,instance in instances.items():
+                        if not self.targets[name].exists():
+                            functions_to_execute[name] = instance
+
+            elif len(self.args.rerun) == 0:
+                functions_to_execute.update(self.cached_functions)
                 for instances in self.instances.values():
-                    functions_to_delete.update(instances)
+                    functions_to_execute.update(instances)
+
             else:
-                for name in self.args.delete:
+                for name in self.args.rerun:
                     if name in self.cached_functions.keys():
-                        functions_to_delete[name] = self.cached_functions[name]
+                        functions_to_execute[name] = self.cached_functions[name]
                     elif name in self.instances.keys():
-                        functions_to_delete.update(self.instances[name])
+                        functions_to_execute.update(self.instances[name])
                     else:
                         try:
                             base = name.split('-')[0]
-                            functions_to_delete[name] = self.instances[base][name]
+                            functions_to_execute[name] = self.instances[base][name]
                         except KeyError:
                             raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
 
+            aborting = False
             if self.rank == 0:
-                overwriten = self._overwrite(names=functions_to_delete.keys())
+                overwriten = self._overwrite(names=functions_to_execute.keys())
                 if not overwriten:
+                    aborting = True
                     print(colored('Aborting...', color='yellow', attrs=['bold']))
+            aborting = MPI.COMM_WORLD.bcast(aborting, root=0)
+            if aborting:
+                return
 
-            return
+            if self.args.action == 'slurm':
+                ntasks = len(functions_to_execute)
+                # slurm.create_lookup(self.filename, functions_to_execute.keys())
+                sbatch_filename = slurm.create_sbatch(self.filename, functions_to_execute.keys(), 
+                        time=self.args.time, memory=self.args.memory)
 
-        ### write store to file
-        if store is not None:
-            with h5py.File('store.h5', 'w') as f:
-                for name,value in store.items():
-                    f[name] = value
+                wall_time = slurm.wall_time(self.args.time)
+                print(colored('sbatch file', color='yellow', attrs=['bold']))
+                subprocess.run(['cat',  f'{sbatch_filename}'])
+                print(colored('\nSlurm job', color='yellow', attrs=['bold']))
+                print('    Number of tasks:', colored(f'{ntasks}', attrs=['bold']))
+                print('    Max wall-time:', colored(f'{wall_time:.2f} hours', attrs=['bold']))
+                print('    Max CPU-hour usage:', colored(f'{ntasks*wall_time:.2f} hours', attrs=['bold']))
 
-        ### determine which functions to execute based on file and command line
-        functions_to_execute = dict()
-        if self.args.rerun is None:
-            for name,func in self.cached_functions.items():
-                if not self.targets[name].exists():
-                    functions_to_execute[name] = func
+                if not self.args.no_submit:
+                    submit_job = input(colored('\nSubmit Slurm job? (y/n) ', color='yellow', attrs=['bold']))
+                    if submit_job != 'y':
+                        print(colored('\nNot submitting Slurm job', color='yellow', attrs=['bold']))
+                        return 
 
-            for base,instances in self.instances.items():
-                for name,instance in instances.items():
-                    if not self.targets[name].exists():
-                        functions_to_execute[name] = instance
+                    subprocess.run(['sbatch', sbatch_filename])
+                    print(colored('\nSlurm job submitted', color='yellow', attrs=['bold']))
 
-        elif len(self.args.rerun) == 0:
-            functions_to_execute.update(self.cached_functions)
-            for instances in self.instances.values():
-                functions_to_execute.update(instances)
+                return
 
-        else:
-            for name in self.args.rerun:
-                if name in self.cached_functions.keys():
-                    functions_to_execute[name] = self.cached_functions[name]
-                elif name in self.instances.keys():
-                    functions_to_execute.update(self.instances[name])
-                else:
+            ### execute all items
+            with Pool(processes=self.args.processes) as pool:
+                # for name, func in functions_to_execute.items():
+                    # pool.apply_async(self._execute_function, (func,name))
+
+
+                results = [pool.apply_async(self._execute_function, (func,name)) for name,func in functions_to_execute.items()]
+                # while results:
+                    # for result in results:
+                        # if result.ready():
+                            # result.get()
+                            # results.remove(result)
+                        # else:
+                            # print('progress')
+                    # sleep(.1)
+
+                if USE_SERVER:
+                    t = threading.Thread(target=self.listening_thread) 
+                    t.start()
+
+                for result in results:
                     try:
-                        base = name.split('-')[0]
-                        functions_to_execute[name] = self.instances[base][name]
-                    except KeyError:
-                        raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
+                        result.get()
+                    except Exception as e:
+                        print(e)  # failed simulation; print instead of abort
 
-        aborting = False
-        if self.rank == 0:
-            overwriten = self._overwrite(names=functions_to_execute.keys())
-            if not overwriten:
-                aborting = True
-                print(colored('Aborting...', color='yellow', attrs=['bold']))
-        aborting = MPI.COMM_WORLD.bcast(aborting, root=0)
-        if aborting:
-            return
-
-        if self.args.action == 'slurm':
-            ntasks = len(functions_to_execute)
-            # slurm.create_lookup(self.filename, functions_to_execute.keys())
-            sbatch_filename = slurm.create_sbatch(self.filename, functions_to_execute.keys(), 
-                    time=self.args.time, memory=self.args.memory)
-
-            wall_time = slurm.wall_time(self.args.time)
-            print(colored('sbatch file', color='yellow', attrs=['bold']))
-            subprocess.run(['cat',  f'{sbatch_filename}'])
-            print(colored('\nSlurm job', color='yellow', attrs=['bold']))
-            print('    Number of tasks:', colored(f'{ntasks}', attrs=['bold']))
-            print('    Max wall-time:', colored(f'{wall_time:.2f} hours', attrs=['bold']))
-            print('    Max CPU-hour usage:', colored(f'{ntasks*wall_time:.2f} hours', attrs=['bold']))
-
-            if not self.args.no_submit:
-                submit_job = input(colored('\nSubmit Slurm job? (y/n) ', color='yellow', attrs=['bold']))
-                if submit_job != 'y':
-                    print(colored('\nNot submitting Slurm job', color='yellow', attrs=['bold']))
-                    return 
-
-                subprocess.run(['sbatch', sbatch_filename])
-                print(colored('\nSlurm job submitted', color='yellow', attrs=['bold']))
-
-            return
-
-        ### execute all items
-        with Pool(processes=self.args.processes) as pool:
-            # for name, func in functions_to_execute.items():
-                # pool.apply_async(self._execute_function, (func,name))
-
-
-            results = [pool.apply_async(self._execute_function, (func,name)) for name,func in functions_to_execute.items()]
-            # while results:
-                # for result in results:
-                    # if result.ready():
-                        # result.get()
-                        # results.remove(result)
-                    # else:
-                        # print('progress')
-                # sleep(.1)
-
-            if USE_SERVER:
-                t = threading.Thread(target=self.listening_thread) 
-                t.start()
-
-            for result in results:
-                try:
-                    result.get()
-                except Exception as e:
-                    print(e)  # failed simulation; print instead of abort
-
-            pool.close()
-            pool.join()
-            
-            self.complete = True
-            
-            if USE_SERVER:
-                t.join()
-                self.pipe.close()
+                pool.close()
+                pool.join()
+                
+                self.complete = True
+                
+                if USE_SERVER:
+                    t.join()
+                    self.pipe.close()
 
         ### At-end functions
         if self.rank == 0:
@@ -542,6 +543,7 @@ class pinboard:
             p.add_argument('-r', '--rerun', nargs='*', type=str, default=None, help='re-run specific cached functions by name')
             p.add_argument('-f', '--force', action='store_true', help='force over-write any existing cached data')
             p.add_argument('-d', '--delete', nargs='*', type=str, default=None, help='delete specified cached data')
+            p.add_argument('--at-end', action='store_true', default=False, help="only run at_end functions")
             p.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
             p.add_argument('-np', '--processes', type=int, default=1, help='number of processes to use in parallel execution')
 
