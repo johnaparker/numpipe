@@ -288,16 +288,21 @@ class pinboard:
 
             else:
                 for name in self.args.rerun:
-                    if name in self.cached_functions.keys():
-                        functions_to_execute[name] = self.cached_functions[name]
-                    elif name in self.instances.keys():
-                        functions_to_execute.update(self.instances[name])
+                    if name[-3:] == '.h5':
+                        actual_name = name[name.find('-')+1:-3]
+                    else:
+                        actual_name = name
+
+                    if actual_name in self.cached_functions.keys():
+                        functions_to_execute[actual_name] = self.cached_functions[actual_name]
+                    elif actual_name in self.instances.keys():
+                        functions_to_execute.update(self.instances[actual_name])
                     else:
                         try:
-                            base = name.split('-')[0]
-                            functions_to_execute[name] = self.instances[base][name]
+                            base = actual_name.split('-')[0]
+                            functions_to_execute[actual_name] = self.instances[base][actual_name]
                         except KeyError:
-                            raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
+                            raise ValueError(f"Invalid argument: function '{actual_name}' does not correspond to any cached function")
 
             aborting = False
             if self.rank == 0:
