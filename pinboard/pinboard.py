@@ -194,11 +194,25 @@ class pinboard:
 
         if func_name in self.instance_functions.keys():
             if instance is None:
-                def load_next():
-                    for target_name in self.instances[func_name].keys():
-                        # target_name = f'{func_name}-{instance_name}'
-                        yield (target_name, self.targets[target_name].load())
-                return load_next()
+                class load_next:
+                    def __init__(self, instances, targets):
+                        self.length = len(instances[func_name].keys())
+                        self.instances = iter(instances[func_name].keys())
+                        self.targets = targets
+
+                    def __len__(self): 
+                        return self.length
+
+                    def __iter__(self):
+                        return self
+
+                    def __next__(self):
+                        target_name = next(self.instances)
+                        instance_name = target_name[target_name.find('-')+1:]
+                        return (instance_name, self.targets[target_name].load())
+
+                return load_next(self.instances, self.targets)
+
             else:
                 target_name = f'{func_name}-{instance}'
         else:
