@@ -418,7 +418,7 @@ class pinboard:
                         else:
                             for symbol_name, next_symbol in next_symbols.items():
                                 if symbol_name not in caches:
-                                    caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name)
+                                    caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name, cache_time=self.args.cache_time)
                                 else:
                                     caches[symbol_name].add(next_symbol)
 
@@ -565,6 +565,7 @@ class pinboard:
             p.add_argument('--at-end', action='store_true', default=False, help="only run at_end functions")
             p.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
             p.add_argument('-np', '--processes', type=int, default=1, help='number of processes to use in parallel execution')
+            p.add_argument('-ct', '--cache_time', type=float, default=300, help='time until data cached data is flushed to file')
 
 
         slurm_parse.add_argument('-t', '--time', type=str, default='36', help='maximum run-time for the Slurm job, formated as {hours}:{minutes}:{seconds} (minutes and seconds optional)')
