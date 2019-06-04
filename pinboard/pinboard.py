@@ -65,15 +65,28 @@ class Bunch:
     def __getitem__(self, key):
         return self.__dict__[key]
 
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
+
 def load_symbols(filepath):
     """Load all symbols from h5 filepath"""
 
     collection = {}
+    args = {}
     with h5py.File(filepath, 'r') as f:
         for dset_name in f:
+            if isinstance(f[dset_name], h5py.Group):
+                continue
             collection[dset_name] = f[dset_name][...]
 
-    return Bunch(collection)
+        bunch = Bunch(collection)
+        if 'args' in f:
+            for dset_name in f['args']:
+                args[dset_name] = f['args'][dset_name][...]
+            if args:
+                bunch['args'] = Bunch(args)
+
+    return bunch
 
 def write_symbols(filepath, symbols):
     """Write all symbols to h5 file, where symbols is a {name: value} dictionary
@@ -135,6 +148,16 @@ class target:
     def write(self, symbols):
         """Write symbols"""
         write_symbols(self.filepath, symbols)
+
+    def write_args(self, symbols):
+        """Write instance argument symbols to args group"""
+        with h5py.File(self.filepath, 'a') as f:
+            g = f.require_group('args')
+            for name,symbol in symbols.items():
+                try:
+                    g[name] = symbol
+                except TypeError:
+                    continue
 
     def exists(self):
         """Return true if the target exists"""
@@ -338,6 +361,12 @@ class pinboard:
                     print(colored('\nSlurm job submitted', color='yellow', attrs=['bold']))
 
                 return
+
+            for func_name, instance in self.instances.items():
+                for instance_name, df in instance.items():
+                    # self.instances[func.__name__][func_name] = deferred_function(func, func_name, kwargs=kwargs, num_iterations=num_iterations)
+                    self.targets[instance_name].write_args(df.kwargs)
+
 
             ### execute all items
             with Pool(processes=self.args.processes) as pool:

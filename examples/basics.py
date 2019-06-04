@@ -54,7 +54,7 @@ def vis():
 
     cache = job.load(sim4, 2)
     for name, cache in job.load(sim4):
-        print(f'{name} instance has y = {cache.y}')
+        print(f'{name} instance has y = {cache.y} with param = {cache.args.param}')
     # with job.load(sim4, defer=True) as cache:
     plt.show()
 
