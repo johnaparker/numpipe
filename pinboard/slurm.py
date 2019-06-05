@@ -64,7 +64,7 @@ def format_time(time_str):
 # #SBATCH --time={time_str}
 # #SBATCH --mem-per-cpu={mem_in_mb}
 
-# python {py_filename}.py -r {r_flag} -np {ntasks} --no-at-end > output/{py_filename}.log 2> output/{py_filename}.err
+# python {py_filename}.py -r {r_flag} -p {ntasks} --no-at-end > output/{py_filename}.log 2> output/{py_filename}.err
 # """
     
     # sbatch_filename = f'{py_filename}.sbatch'
@@ -97,7 +97,7 @@ ulimit -u 10000
 srun="srun --exclusive -N1 -n1"
 parallel="parallel --delay .2 -j $SLURM_NTASKS --joblog runtask.log --resume"
 
-$parallel "$srun python {py_filename}.py -r {{1}} --no-at-end > output/out_{{1}}.txt 2> output/out_{{1}}.err" :::: {py_filename}-lookup.txt
+$parallel "$srun python {py_filename}.py -r {{1}} -p 1 --no-at-end > output/out_{{1}}.txt 2> output/out_{{1}}.err" :::: {py_filename}-lookup.txt
 """
     
     sbatch_filename = f'{py_filename}.sbatch'
