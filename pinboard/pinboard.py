@@ -362,12 +362,6 @@ class pinboard:
 
                 return
 
-            for func_name, instance in self.instances.items():
-                for instance_name, df in instance.items():
-                    # self.instances[func.__name__][func_name] = deferred_function(func, func_name, kwargs=kwargs, num_iterations=num_iterations)
-                    self.targets[instance_name].write_args(df.kwargs)
-
-
             ### execute all items
             with Pool(processes=self.args.processes) as pool:
                 # for name, func in functions_to_execute.items():
@@ -432,6 +426,11 @@ class pinboard:
         try:
             if self.rank == 0:
                 print(colored(f"Running cached function '{name}'", color='yellow'))
+                if func.__name__ in self.instances.keys():   ### write arguments if instance funcitont 
+                    instance = self.instances[func.__name__]
+                    df = instance[name]
+                    self.targets[name].write_args(df.kwargs)
+
             MPI.COMM_WORLD.Barrier()
             symbols = func()
 
