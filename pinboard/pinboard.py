@@ -339,7 +339,7 @@ class pinboard:
 
             if self.args.action == 'slurm':
                 ntasks = len(functions_to_execute)
-                # slurm.create_lookup(self.filename, functions_to_execute.keys())
+                slurm.create_lookup(self.filename, functions_to_execute.keys())
                 sbatch_filename = slurm.create_sbatch(self.filename, functions_to_execute.keys(), 
                         time=self.args.time, memory=self.args.memory)
 
