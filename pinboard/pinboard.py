@@ -24,6 +24,7 @@ import numpy as np
 from mpi4py import MPI
 import subprocess
 from termcolor import colored
+from pathlib import Path
 
 USE_SERVER = False
 
@@ -256,6 +257,21 @@ class pinboard:
         ### display only event
         if self.args.action == 'display':
             self.display_functions()
+            return
+
+        if self.args.action == 'clean':
+            pathlist = pathlib.Path(self.dirpath).glob(f'{self.filename}-*.h5')
+            current = [target.filepath for target in self.targets.values()]
+
+            filepaths = []
+            for path in pathlist:
+                path_str = str(path)
+                if path_str not in current:
+                    filepaths.append(path_str)
+
+            confirm = self._clean(filepaths)
+            if not confirm:
+                print(colored('Aborting...', color='yellow', attrs=['bold']))
             return
         
         if not self.args.at_end:
@@ -546,6 +562,33 @@ class pinboard:
 
         self.targets[name].write(symbols)
 
+    def _clean(self, filepaths):
+        """clean a set of filepaths
+
+           Argumnets: 
+               filepaths      list of filepaths to hdf5 files
+        """
+        if not self.rank == 0:
+            return
+
+        if filepaths:
+            summary = colored("The following cached data will be deleted:\n", color='yellow', attrs=['bold'])
+            for filepath in filepaths:
+                summary += filepath + '\n'
+
+            if not self.args.force:
+                print(summary)
+                delete = input(colored(f"Continue with job? (y/n) ", color='yellow', attrs=['bold']))
+                print('')
+
+                if delete != 'y':
+                    return False
+
+            for filepath in filepaths:
+                os.remove(filepath)
+
+        return True
+
     def _overwrite(self, names):
         """Request if existing hdf5 file should be overwriten
 
@@ -584,6 +627,7 @@ class pinboard:
 
         subparsers = parser.add_subparsers(dest="action")
         display_parser = subparsers.add_parser('display', help='display available functions and descriptions')
+        display_parser = subparsers.add_parser('clean', help='remove all h5files that are no longer cache functions')
         slurm_parse = subparsers.add_parser('slurm', help='run on a system with the Slurm Workload Manager')
 
         for p in [parser, slurm_parse]:
