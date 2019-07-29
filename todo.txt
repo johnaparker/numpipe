@@ -1,0 +1,9 @@
+npcache_collection and h5cache_collection to cache a collection of writes (cache_size and cache_time then apply globally rather than per array)
+
+move convenience / utility functions from numflow out
+
+clearly define target vs instance vs deferred_function; shouldn't have 7 types of dicts in numflow()
+
+separate all code related to parser
+
+separate all code that displays text / prompts the user
