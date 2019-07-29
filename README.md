@@ -1,15 +1,15 @@
-numflow
-==============
+# NumFlow
 
-Usage
---------------
+## Features
 
-Installation
---------------
+## Installation
+NumFlow can be installed with pip
+```shell
+pip install numflow
+```
 
-Dependencies
---------------
+## Usage
+See the examples folder for how to use FPlanck.
 
-License
---------------
-numflow is licensed under the terms of the MIT license.
+## License
+NumFlow is licensed under the terms of the MIT license.
