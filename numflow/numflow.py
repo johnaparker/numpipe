@@ -6,7 +6,6 @@ Defines the numflow class, which performs:
     * cache results as they come in
 """
 
-import argparse
 import h5py
 import os
 import sys
@@ -26,6 +25,7 @@ from termcolor import colored
 from numflow import slurm
 from numflow.execution import deferred_function, target
 from numflow.utility import doublewrap, once
+from numflow.parser import run_parser
 from numflow.h5cache import h5cache_from
 from numflow.networking import recv_msg,send_msg
 
@@ -112,8 +112,7 @@ class numflow:
            Arguments:
                store       {name: data} dictionary to write as additional data (optional)
         """
-
-        self._run_parser()
+        self.args = run_parser()
 
         ### display only event
         if self.args.action == 'display':
@@ -481,29 +480,3 @@ class numflow:
                 self.targets[data].remove()
 
         return True
-
-    def _run_parser(self):
-        """parse user request"""
-        parser = argparse.ArgumentParser()
-
-        subparsers = parser.add_subparsers(dest="action")
-        display_parser = subparsers.add_parser('display', help='display available functions and descriptions')
-        display_parser = subparsers.add_parser('clean', help='remove all h5files that are no longer cache functions')
-        slurm_parse = subparsers.add_parser('slurm', help='run on a system with the Slurm Workload Manager')
-
-        for p in [parser, slurm_parse]:
-            p.add_argument('-r', '--rerun', nargs='*', type=str, default=None, help='re-run specific cached functions by name')
-            p.add_argument('-f', '--force', action='store_true', help='force over-write any existing cached data')
-            p.add_argument('-d', '--delete', nargs='*', type=str, default=None, help='delete specified cached data')
-            p.add_argument('--at-end', action='store_true', default=False, help="only run at_end functions")
-            p.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
-            p.add_argument('-p', '--processes', nargs='?', default=1, type=int, help='number of processes to use in parallel execution (default: cpu_count)')
-            p.add_argument('-ct', '--cache_time', type=float, default=300, help='time (in seconds) until data cached data is flushed to file')
-
-
-        slurm_parse.add_argument('-t', '--time', type=str, default='36', help='maximum run-time for the Slurm job, formated as {hours}:{minutes}:{seconds} (minutes and seconds optional)')
-        slurm_parse.add_argument('-m', '--memory', type=float, default=2, help='maximum memory per cpu for the Slurm job in GB')
-        slurm_parse.add_argument('--batch', action='store_true', help='submit the Slurm job in batches')
-        slurm_parse.add_argument('--no-submit', action='store_true', help="don't submit the Slurm job after creating sbatch files")
-
-        self.args = parser.parse_args()
