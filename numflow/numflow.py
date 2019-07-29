@@ -20,9 +20,8 @@ import pickle
 import numpy as np
 from mpi4py import MPI
 import subprocess
-from termcolor import colored
 
-from numflow import slurm
+from numflow import slurm, display
 from numflow.execution import deferred_function, target
 from numflow.utility import doublewrap, once
 from numflow.parser import run_parser
@@ -131,7 +130,7 @@ class numflow:
 
             confirm = self._clean(filepaths)
             if not confirm:
-                print(colored('Aborting...', color='yellow', attrs=['bold']))
+                display.abort_message()
             return
         
         if not self.args.at_end:
@@ -158,7 +157,7 @@ class numflow:
                 if self.rank == 0:
                     overwriten = self._overwrite(names=functions_to_delete.keys())
                     if not overwriten:
-                        print(colored('Aborting...', color='yellow', attrs=['bold']))
+                        display.abort_message()
 
                 return
 
@@ -208,7 +207,7 @@ class numflow:
                 overwriten = self._overwrite(names=functions_to_execute.keys())
                 if not overwriten:
                     aborting = True
-                    print(colored('Aborting...', color='yellow', attrs=['bold']))
+                    display.abort_message()
             aborting = MPI.COMM_WORLD.bcast(aborting, root=0)
             if aborting:
                 return
@@ -216,33 +215,18 @@ class numflow:
             if self.args.action == 'slurm':
                 ntasks = len(functions_to_execute)
                 slurm.create_lookup(self.filename, functions_to_execute.keys())
+
                 sbatch_filename = slurm.create_sbatch(self.filename, functions_to_execute.keys(), 
                         time=self.args.time, memory=self.args.memory)
-
                 wall_time = slurm.wall_time(self.args.time)
-                print(colored('sbatch file', color='yellow', attrs=['bold']))
-                subprocess.run(['cat',  f'{sbatch_filename}'])
-                print(colored('\nSlurm job', color='yellow', attrs=['bold']))
-                print('    Number of tasks:', colored(f'{ntasks}', attrs=['bold']))
-                print('    Max wall-time:', colored(f'{wall_time:.2f} hours', attrs=['bold']))
-                print('    Max CPU-hour usage:', colored(f'{ntasks*wall_time:.2f} hours', attrs=['bold']))
 
-                if not self.args.no_submit:
-                    submit_job = input(colored('\nSubmit Slurm job? (y/n) ', color='yellow', attrs=['bold']))
-                    if submit_job != 'y':
-                        print(colored('\nNot submitting Slurm job', color='yellow', attrs=['bold']))
-                        return 
-
-                    subprocess.run(['sbatch', sbatch_filename])
-                    print(colored('\nSlurm job submitted', color='yellow', attrs=['bold']))
-
+                display.slurm_message(sbatch_filename, wall_time, ntasks, self.args.no_submit)
                 return
 
             ### execute all items
             with Pool(processes=self.args.processes) as pool:
                 # for name, func in functions_to_execute.items():
                     # pool.apply_async(self._execute_function, (func,name))
-
 
                 results = [pool.apply_async(self._execute_function, (func,name)) for name,func in functions_to_execute.items()]
                 # while results:
@@ -276,7 +260,8 @@ class numflow:
         ### At-end functions
         if self.rank == 0:
             if self.at_end_functions and not self.args.no_at_end:
-                print(colored('Running at-end functions', color='yellow'))
+                display.at_end_message()
+
                 for func in self.at_end_functions.values():
                     func()
 
@@ -301,7 +286,7 @@ class numflow:
     def _execute_function(self, func, name):
         try:
             if self.rank == 0:
-                print(colored(f"Running cached function '{name}'", color='yellow'))
+                display.cached_function_message(name)
                 if func.__name__ in self.instances.keys():   ### write arguments if instance funcitont 
                     instance = self.instances[func.__name__]
                     df = instance[name]
@@ -398,22 +383,7 @@ class numflow:
     def display_functions(self):
         if not self.rank == 0:
             return
-
-        print(colored("cached functions:", color='yellow', attrs=['bold']))
-        for name,func in self.cached_functions.items():
-            print('    ', colored(name, color='yellow'), ' -- ', func.__doc__, sep='')
-
-        for base,instance in self.instances.items():
-            print('    ', colored(base, color='yellow'), ' -- ', self.instance_functions[base].__doc__, sep='')
-            print('      ', f'[{len(instance)} instances] ', end='')
-            for name, func in instance.items():
-                subname = name.split('-')[1]
-                print(subname, end=' ')
-            print('')
-
-        print(colored("\nat-end functions:", color='yellow', attrs=['bold']))
-        for name,func in self.at_end_functions.items():
-            print('    ', colored(name, color='yellow'), ' -- ', func.__doc__, sep='')
+        display.display_message(self.cached_functions, self.instances, self.instance_functions, self.at_end_functions)
 
     def _write_symbols(self, name, symbols):
         """write symbols to cache inside group"""
@@ -432,16 +402,10 @@ class numflow:
             return
 
         if filepaths:
-            summary = colored("The following cached data will be deleted:\n", color='yellow', attrs=['bold'])
-            for filepath in filepaths:
-                summary += filepath + '\n'
-
             if not self.args.force:
-                print(summary)
-                delete = input(colored(f"Continue with job? (y/n) ", color='yellow', attrs=['bold']))
-                print('')
+                delete = display.delete_message(filepaths)
 
-                if delete != 'y':
+                if not delete:
                     return False
 
             for filepath in filepaths:
@@ -450,7 +414,7 @@ class numflow:
         return True
 
     def _overwrite(self, names):
-        """Request if existing hdf5 file should be overwriten
+        """Request if existing hdf5 file should be overwriten, return True if data is deleted
 
            Argumnets: 
                names        list of group names to check
@@ -458,25 +422,20 @@ class numflow:
         if not self.rank == 0:
             return
 
-        data_to_delete = []
+        filepaths = []
         
         if names:
-            data_to_delete.extend(filter(lambda name: self.targets[name].exists(), names))
+            data_to_delete = (filter(lambda name: self.targets[name].exists(), names))
+            filepaths = [self.targets[data].filepath for data in data_to_delete]
 
-        if data_to_delete:
-            summary = colored("The following cached data will be deleted:\n", color='yellow', attrs=['bold'])
-            for data in data_to_delete:
-                summary += self.targets[data].filepath + '\n'
-
+        if filepaths:
             if not self.args.force:
-                print(summary)
-                delete = input(colored(f"Continue with job? (y/n) ", color='yellow', attrs=['bold']))
-                print('')
+                delete = display.delete_message(filepaths)
 
-                if delete != 'y':
+                if not delete:
                     return False
 
-            for data in data_to_delete:
-                self.targets[data].remove()
+            for filepath in filepaths:
+                os.remove(filepath)
 
         return True
