@@ -2,7 +2,7 @@ import socket
 import pickle
 import sys
 from time import sleep
-from pinboard.networking import send_msg, recv_msg
+from numflow.networking import send_msg, recv_msg
 
 address = ('localhost', 6000)
 

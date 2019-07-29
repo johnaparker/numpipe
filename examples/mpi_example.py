@@ -1,12 +1,12 @@
 import numpy as np
 from random import random
-from pinboard import pinboard
+from numflow import numflow
 import os
 from mpi4py import MPI
 import sys
 
 ### Setup
-job = pinboard()
+job = numflow()
 
 @job.cache
 def sim():

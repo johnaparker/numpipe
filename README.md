@@ -1,4 +1,4 @@
-Pinboard
+numflow
 ==============
 
 Usage
@@ -12,4 +12,4 @@ Dependencies
 
 License
 --------------
-Pinboard is licensed under the terms of the MIT license.
+numflow is licensed under the terms of the MIT license.

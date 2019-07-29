@@ -1,8 +1,8 @@
-from pinboard import pinboard
+from numflow import numflow
 from time import sleep
 
 ### Setup
-job = pinboard()
+job = numflow()
 
 N = 10
 T = .5

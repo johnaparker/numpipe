@@ -1,9 +1,9 @@
 """
-Pinboard
+numflow
 =======
 """
 
 from . import h5cache
 from . import networking
 from . import slurm
-from .pinboard import pinboard, once
+from .numflow import numflow, once

@@ -1,9 +1,9 @@
-from pinboard import pinboard, once
+from numflow import numflow, once
 import numpy as np
 import matplotlib.pyplot as plt
 
 ### Setup
-job = pinboard()
+job = numflow()
 
 ### Fast, shared code goes here
 x = np.linspace(0,1,10)

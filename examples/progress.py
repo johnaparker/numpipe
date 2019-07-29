@@ -1,9 +1,9 @@
-from pinboard import pinboard
+from numflow import numflow
 from time import sleep
 from tqdm import tqdm
 
 ### Setup
-job = pinboard()
+job = numflow()
 
 import numpy as np
 N = 100

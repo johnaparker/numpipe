@@ -1,10 +1,10 @@
 import numpy as np
 from random import random
-from pinboard import pinboard
+from numflow import numflow
 import os
 
 ### Setup
-job = pinboard()
+job = numflow()
 
 @job.cache
 def sim(param):

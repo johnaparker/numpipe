@@ -8,9 +8,9 @@ import os
 import sys
 import pathlib
 import types
-from pinboard.h5cache import h5cache_from
-from pinboard.networking import recv_msg,send_msg
-from pinboard import slurm
+from numflow.h5cache import h5cache_from
+from numflow.networking import recv_msg,send_msg
+from numflow import slurm
 from inspect import signature
 import multiprocessing
 from multiprocessing import Pool, Value
@@ -170,7 +170,7 @@ class target:
     def remove(self):
         os.remove(self.filepath)
 
-class pinboard:
+class numflow:
     """Deferred function evaluation and access to cached function output"""
 
     def __init__(self, dirpath=None):
