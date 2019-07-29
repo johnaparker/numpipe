@@ -1,5 +1,9 @@
 """
-Python API to create jobs and register cached functions and at-end functions
+Defines the numflow class, which performs:
+    * keeps track of all cached functions
+    * parse arguments when program is run
+    * execute functions (possibly in parallel)
+    * cache results as they come in
 """
 
 import argparse
@@ -8,167 +12,24 @@ import os
 import sys
 import pathlib
 import types
-from numflow.h5cache import h5cache_from
-from numflow.networking import recv_msg,send_msg
-from numflow import slurm
 from inspect import signature
-import multiprocessing
 from multiprocessing import Pool, Value
 import threading
 import traceback
-from time import sleep
-from functools import wraps
 import socket
 import pickle
 import numpy as np
 from mpi4py import MPI
 import subprocess
 from termcolor import colored
-from pathlib import Path
+
+from numflow import slurm
+from numflow.execution import deferred_function, target
+from numflow.utility import doublewrap, once
+from numflow.h5cache import h5cache_from
+from numflow.networking import recv_msg,send_msg
 
 USE_SERVER = False
-
-class once(dict):
-    """identical to dict; used to yield something only once"""
-    pass
-
-def doublewrap(f):
-    """
-    a decorator decorator, allowing the decorator to be used as:
-    @decorator(with, arguments, and=kwargs)
-    or
-    @decorator
-    """
-    @wraps(f)
-    def new_dec(*args, **kwargs):
-        if len(args) == 2 and len(kwargs) == 0 and callable(args[1]):
-            # actual decorated function
-            return f(*args)
-        else:
-            # decorator arguments
-            return lambda realf: f(args[0], realf, *args[1:], **kwargs)
-
-    return new_dec
-
-def yield_traceback(f):
-    def wrap_f(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except:
-            raise Exception("".join(traceback.format_exception(*sys.exc_info())))
-    return wrap_f
-
-class Bunch:
-    """Simply convert a dictionary into a class with data members equal to the dictionary keys"""
-    def __init__(self, adict):
-        self.__dict__.update(adict)
-
-    def __getitem__(self, key):
-        return self.__dict__[key]
-
-    def __setitem__(self, key, value):
-        self.__dict__[key] = value
-
-def load_symbols(filepath):
-    """Load all symbols from h5 filepath"""
-
-    collection = {}
-    args = {}
-    with h5py.File(filepath, 'r') as f:
-        for dset_name in f:
-            if isinstance(f[dset_name], h5py.Group):
-                continue
-            collection[dset_name] = f[dset_name][...]
-
-        bunch = Bunch(collection)
-        if 'args' in f:
-            for dset_name in f['args']:
-                args[dset_name] = f['args'][dset_name][...]
-            if args:
-                bunch['args'] = Bunch(args)
-
-    return bunch
-
-def write_symbols(filepath, symbols):
-    """Write all symbols to h5 file, where symbols is a {name: value} dictionary
-       
-       Arguments:
-           filepath      path to file
-           symbols       {name: vale} dictionary
-    """
-    with h5py.File(filepath, 'a') as f:
-        for name,symbol in symbols.items():
-            f[name] = symbol
-
-current_iteration = {}
-
-
-class first_argument:
-    def __init__(self, name, num_iterations=None):
-        self.name = name
-        self.num_iterations = num_iterations
-        if num_iterations is not None:
-            current_iteration[name] = Value('i', 0)
-
-    def iterations(self):
-        def gen():
-            for i in range(self.num_iterations):
-                yield current_iteration[self.name].value
-                current_iteration[self.name].value += 1
-        return gen()
-
-class deferred_function:
-    """wrapper around a function -- to defer its execution and store metadata"""
-    def __init__(self, function, name, args=(), kwargs={}, num_iterations=None):
-        self.function = function
-        self.args = args
-        self.kwargs = kwargs
-        self.__name__ = function.__name__ 
-        self.__doc__  = function.__doc__ 
-        self.name = name
-
-        self.arg = first_argument(name, num_iterations=num_iterations)
-
-    def __call__(self):
-        # return self.function(self.arg, *self.args, **self.kwargs)
-        np.random.seed(int.from_bytes(os.urandom(4), byteorder='little'))
-        return self.function(*self.args, **self.kwargs)
-
-class target:
-    """
-    A target is the output of a cached function and determines whether it needs to be rerun
-    It specifies the type of storage file
-    """
-    def __init__(self, filepath):
-        self.filepath = filepath
-
-    def load(self):
-        """Load symbols"""
-        return load_symbols(self.filepath)
-
-    def write(self, symbols):
-        """Write symbols"""
-        write_symbols(self.filepath, symbols)
-
-    def write_args(self, symbols):
-        """Write instance argument symbols to args group"""
-        with h5py.File(self.filepath, 'a') as f:
-            g = f.require_group('args')
-            for name,symbol in symbols.items():
-                try:
-                    g[name] = symbol
-                except TypeError:
-                    continue
-
-    def exists(self):
-        """Return true if the target exists"""
-        if os.path.isfile(self.filepath):
-            return True
-        else:
-            return False
-
-    def remove(self):
-        os.remove(self.filepath)
 
 class numflow:
     """Deferred function evaluation and access to cached function output"""
