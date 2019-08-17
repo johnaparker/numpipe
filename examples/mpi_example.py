@@ -1,12 +1,12 @@
 import numpy as np
 from random import random
-from numflow import numflow
+from numflow import scheduler
 import os
 from mpi4py import MPI
 import sys
 
 ### Setup
-job = numflow()
+job = scheduler()
 
 @job.cache
 def sim():

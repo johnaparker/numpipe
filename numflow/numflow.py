@@ -1,5 +1,5 @@
 """
-Defines the numflow class, which performs:
+Defines the scheduler class, which does the following:
     * keeps track of all cached functions
     * parse arguments when program is run
     * execute functions (possibly in parallel)
@@ -30,7 +30,7 @@ from numflow.networking import recv_msg,send_msg
 
 USE_SERVER = False
 
-class numflow:
+class scheduler:
     """Deferred function evaluation and access to cached function output"""
 
     def __init__(self, dirpath=None):

@@ -1,8 +1,8 @@
-from numflow import numflow
+from numflow import scheduler
 from time import sleep
 
 ### Setup
-job = numflow()
+job = scheduler()
 
 N = 10
 T = .5

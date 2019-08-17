@@ -13,4 +13,4 @@ from . import parser
 from . import display
 
 from .utility import once
-from .numflow import numflow
+from .numflow import scheduler

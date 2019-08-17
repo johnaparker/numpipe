@@ -1,9 +1,9 @@
-from numflow import numflow, once
+from numflow import scheduler, once
 import numpy as np
 import matplotlib.pyplot as plt
 
 ### Setup
-job = numflow()
+job = scheduler()
 
 ### Fast, shared code goes here
 x = np.linspace(0,1,10)

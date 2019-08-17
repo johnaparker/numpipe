@@ -1,10 +1,10 @@
 import numpy as np
 from random import random
-from numflow import numflow
+from numflow import scheduler
 import os
 
 ### Setup
-job = numflow()
+job = scheduler()
 
 @job.cache
 def sim(param):

@@ -1,9 +1,9 @@
-from numflow import numflow
+from numflow import scheduler
 from time import sleep
 from tqdm import tqdm
 
 ### Setup
-job = numflow()
+job = scheduler()
 
 import numpy as np
 N = 100
