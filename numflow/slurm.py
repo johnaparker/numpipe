@@ -82,8 +82,9 @@ def create_sbatch(py_filename, func_names, time='36', memory=2, partition='broad
     ntasks = len(func_names)
     mem_in_mb = int(memory*1000)
     time_str = format_time(time)
+    output_dir = f'{py_filename}_output'
 
-    os.makedirs('output', exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
 
     output = f"""#!/bin/sh
 
@@ -97,7 +98,7 @@ ulimit -u 10000
 srun="srun --exclusive -N1 -n1"
 parallel="parallel --delay .2 -j $SLURM_NTASKS --joblog runtask.log --resume"
 
-$parallel "$srun python {py_filename}.py -r {{1}} -p 1 --no-at-end > output/out_{{1}}.txt 2> output/out_{{1}}.err" :::: {py_filename}-lookup.txt
+$parallel "$srun python {py_filename}.py -r {{1}} -p 1 --no-at-end > {output_dir}/out_{{1}}.txt 2> {output_dir}/out_{{1}}.err" :::: {py_filename}-lookup.txt
 """
     
     sbatch_filename = f'{py_filename}.sbatch'
