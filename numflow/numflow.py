@@ -132,6 +132,9 @@ class scheduler:
             if not confirm:
                 display.abort_message()
             return
+
+        import numflow as nf
+        nf._tqdm_mininterval = self.args.tqdm
         
         if not self.args.at_end:
             ### determine which cahced data to delete

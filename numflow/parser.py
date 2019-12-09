@@ -19,6 +19,7 @@ def run_parser():
         p.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
         p.add_argument('-p', '--processes', nargs='?', default=1, type=int, help='number of processes to use in parallel execution (default: cpu_count)')
         p.add_argument('-ct', '--cache_time', type=float, default=300, help='time (in seconds) until data cached data is flushed to file')
+        p.add_argument('--tqdm', type=float, default=.1, help='time (in seconds) for tqdm mininterval argument')
 
 
     slurm_parse.add_argument('-t', '--time', type=str, default='36', help='maximum run-time for the Slurm job, formated as {hours}:{minutes}:{seconds} (minutes and seconds optional)')
