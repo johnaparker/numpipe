@@ -1,5 +1,11 @@
-npcache_collection and h5cache_collection to cache a collection of writes (cache_size and cache_time then apply globally rather than per array)
-
 clearly define target vs instance vs deferred_function; shouldn't have 7 types of dicts in numflow()
 
-tqdm -- mininterval should be 60+ when using slurm
+dependency tree for parallel execution (explicit and implicit)
+
+parallel execution with a single h5 file (not add_instance)
+
+experiment with Telegram bot 
+
+h5cache: max_memory across all npcaches, npcaches need to concatenate some minimum size
+
+defer load option to read only part of the h5file

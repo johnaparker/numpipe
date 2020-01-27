@@ -25,7 +25,7 @@ from numflow import slurm, display
 from numflow.execution import deferred_function, target
 from numflow.utility import doublewrap, once
 from numflow.parser import run_parser
-from numflow.h5cache import h5cache_from
+from numflow.h5cache import h5cache
 from numflow.networking import recv_msg,send_msg
 
 USE_SERVER = False
@@ -42,12 +42,13 @@ class scheduler:
         self.instance_iterations = dict()
         self.instance_counts = dict() 
 
-        self.dirpath = dirpath
         if dirpath is None:
             self.dirpath = sys.path[0]
         else:
             if dirpath[0] not in ('/', '~', '$'):
                 self.dirpath = os.path.join(sys.path[0], dirpath)
+            else:
+                self.dirpath = dirpath
             self.dirpath = os.path.expanduser(self.dirpath)
             self.dirpath = os.path.expandvars(self.dirpath)
             pathlib.Path(self.dirpath).mkdir(parents=False, exist_ok=True) 
@@ -61,7 +62,7 @@ class scheduler:
             send_msg(self.pipe, pickle.dumps(['new', 'ID']))
 
         self.complete = False
-        self.rank = MPI.COMM_WORLD.Get_rank()
+        self.mpi_rank = MPI.COMM_WORLD.Get_rank()
 
     #TODO implement load all, jdefer
     def load(self, function=None, instance=None, defer=False):
@@ -157,7 +158,7 @@ class scheduler:
                             except KeyError:
                                 raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
 
-                if self.rank == 0:
+                if self.mpi_rank == 0:
                     overwriten = self._overwrite(names=functions_to_delete.keys())
                     if not overwriten:
                         display.abort_message()
@@ -206,7 +207,7 @@ class scheduler:
                             raise ValueError(f"Invalid argument: function '{actual_name}' does not correspond to any cached function")
 
             aborting = False
-            if self.rank == 0:
+            if self.mpi_rank == 0:
                 overwriten = self._overwrite(names=functions_to_execute.keys())
                 if not overwriten:
                     aborting = True
@@ -261,7 +262,7 @@ class scheduler:
                     self.pipe.close()
 
         ### At-end functions
-        if self.rank == 0:
+        if self.mpi_rank == 0:
             if self.at_end_functions and not self.args.no_at_end:
                 display.at_end_message()
 
@@ -288,7 +289,7 @@ class scheduler:
     # @yield_traceback
     def _execute_function(self, func, name):
         try:
-            if self.rank == 0:
+            if self.mpi_rank == 0:
                 display.cached_function_message(name)
                 if func.__name__ in self.instances.keys():   ### write arguments if instance funcitont 
                     instance = self.instances[func.__name__]
@@ -300,24 +301,20 @@ class scheduler:
 
             ### Generator functions
             if isinstance(symbols, types.GeneratorType):
-                caches = dict()
+                cache = h5cache(self.targets[name].filepath, cache_time=self.args.cache_time)
 
                 ### iterate over all symbols, caching each one
                 for next_symbols in symbols:
-                    if self.rank == 0:
+                    if self.mpi_rank == 0:
                         if type(next_symbols) is once:
                             self._write_symbols(name, next_symbols)
                         else:
                             for symbol_name, next_symbol in next_symbols.items():
-                                if symbol_name not in caches:
-                                    caches[symbol_name] = h5cache_from(next_symbol, self.targets[name].filepath, symbol_name, cache_time=self.args.cache_time)
-                                else:
-                                    caches[symbol_name].add(next_symbol)
+                                cache.add(symbol_name, next_symbol)
 
                 ### empty any of the remaining cache
-                if self.rank == 0:
-                    for cache in caches.values():
-                        cache.flush()
+                if self.mpi_rank == 0:
+                    cache.flush()
 
             ### Standard Functions
             else:
@@ -384,13 +381,13 @@ class scheduler:
         return class_type
 
     def display_functions(self):
-        if not self.rank == 0:
+        if not self.mpi_rank == 0:
             return
         display.display_message(self.cached_functions, self.instances, self.instance_functions, self.at_end_functions)
 
     def _write_symbols(self, name, symbols):
         """write symbols to cache inside group"""
-        if not self.rank == 0:
+        if not self.mpi_rank == 0:
             return
 
         self.targets[name].write(symbols)
@@ -401,7 +398,7 @@ class scheduler:
            Argumnets: 
                filepaths      list of filepaths to hdf5 files
         """
-        if not self.rank == 0:
+        if not self.mpi_rank == 0:
             return
 
         if filepaths:
@@ -422,7 +419,7 @@ class scheduler:
            Argumnets: 
                names        list of group names to check
         """
-        if not self.rank == 0:
+        if not self.mpi_rank == 0:
             return
 
         filepaths = []
