@@ -34,6 +34,20 @@ def doublewrap(func):
 
     return new_func
 
+def doublewrap_1(func):
+    """
+    a decorator decorator, can be used as @decorator(...) or @decorator
+    """
+
+    @wraps(func)
+    def new_func(*args, **kwargs):
+        if len(args) == 1 and len(kwargs) == 0 and callable(args[1]):
+            return func(*args)
+        else:
+            return lambda f: func(args[0], f, *args[1:], **kwargs)
+
+    return new_func
+
 def yield_traceback(func):
     """decorator to properly yield the traceback of a function in a parallel environment"""
 

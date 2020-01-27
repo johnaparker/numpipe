@@ -5,6 +5,7 @@ Execution of functions
 import os
 import h5py
 import numpy as np
+from typing import Iterable
 from numflow.fileio import load_symbols, write_symbols
 
 class deferred_function:
@@ -61,8 +62,18 @@ class target:
 
 class block:
     """
-    A (execution) block consists of a deffered function and a target
+    A (execution) block consists of a deffered function, a target, and optional dependencies
     """
-    def __init__(self, deferred_function, target):
+    def __init__(self, deferred_function, target, dependencies=None):
         self.deferred_function = deferred_function
         self.target = target
+
+        if dependencies is not None:
+            if isinstance(dependencies, Iterable):
+                self.dependencies = dependencies
+            else:
+                self.dependencies = [dependencies]
+        else:
+            self.dependencies = None
+
+        self.complete = False

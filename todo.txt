@@ -1,6 +1,8 @@
-Fix display_function (display_message)
-
-dependency tree for parallel execution (explicit and implicit)
+dependency:
+    * allow dependency for instanaces
+    * If B depends on A, and A throws an error.... do something
+    * more sophisticated tree dependency checking
+    * implicit dependencies using job.load
 
 parallel execution with a single h5 file (not add_instance)
 

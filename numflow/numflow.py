@@ -20,6 +20,7 @@ import pickle
 import numpy as np
 from mpi4py import MPI
 import subprocess
+from time import sleep
 
 from numflow import slurm, display
 from numflow.execution import deferred_function, target, block
@@ -157,28 +158,38 @@ class scheduler:
 
             ### execute all items
             with Pool(processes=self.args.processes) as pool:
-                # for name, block in blocks_to_execute.items():
-                    # pool.apply_async(self._execute_block, (block,name))
+                results = dict()
+                remaining = list(blocks_to_execute.keys())
+                while remaining or results:
+                    to_delete = []
+                    for name in remaining:
+                        block = blocks_to_execute[name]
+                        if self.ready_to_run(block):
+                            results[name] = pool.apply_async(self._execute_block, (block, name))
+                            to_delete.append(name)
 
-                results = [pool.apply_async(self._execute_block, (block,name)) for name,block in blocks_to_execute.items()]
-                # while results:
-                    # for result in results:
-                        # if result.ready():
-                            # result.get()
-                            # results.remove(result)
-                        # else:
-                            # print('progress')
-                    # sleep(.1)
+                    for name in to_delete:
+                        remaining.remove(name)
+
+                    to_delete = []
+                    for name, result in results.items():
+                        if result.ready():
+                            try:
+                                result.get()
+                            except Exception as e:
+                                print(e)  # failed simulation; print instead of abort
+
+                            self.blocks[name].complete = True
+                            to_delete.append(name)
+
+                    for name in to_delete:
+                        results.pop(name)
+
+                    sleep(.1)
 
                 if USE_SERVER:
                     t = threading.Thread(target=self.listening_thread) 
                     t.start()
-
-                for result in results:
-                    try:
-                        result.get()
-                    except Exception as e:
-                        print(e)  # failed simulation; print instead of abort
 
                 pool.close()
                 pool.join()
@@ -196,6 +207,16 @@ class scheduler:
 
                 for func in self.at_end_functions.values():
                     func()
+
+    def ready_to_run(self, block):
+        if block.dependencies is None:
+            return True
+        
+        for func in block.dependencies:
+            if not self.blocks[func.__name__].complete:
+                return False
+        
+        return True
 
     def listening_thread(self):
         while not self.complete:
@@ -284,14 +305,15 @@ class scheduler:
             self.add_instance(func, instance_name, **kwargs)
 
     @doublewrap
-    def cache(self, func, iterations=None):
+    def cache(self, func, depends=None):
         """decorator to add a cached function to be conditionally ran"""
         sig = signature(func)
         if len(sig.parameters) == 0:
             filepath = f'{self.dirpath}/{self.filename}-{func.__name__}.h5'
             self.blocks[func.__name__] = block(
-                        deferred_function(func, num_iterations=iterations),
-                        target(filepath))
+                        deferred_function(func, num_iterations=None),
+                        target(filepath),
+                        dependencies=depends)
         else:
             self.instances[func.__name__] = []
 
