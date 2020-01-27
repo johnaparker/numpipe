@@ -22,12 +22,12 @@ from mpi4py import MPI
 import subprocess
 from time import sleep
 
-from numflow import slurm, display
-from numflow.execution import deferred_function, target, block
-from numflow.utility import doublewrap, once
-from numflow.parser import run_parser
-from numflow.h5cache import h5cache
-from numflow.networking import recv_msg,send_msg
+from numpipe import slurm, display
+from numpipe.execution import deferred_function, target, block
+from numpipe.utility import doublewrap, once
+from numpipe.parser import run_parser
+from numpipe.h5cache import h5cache
+from numpipe.networking import recv_msg,send_msg
 
 USE_SERVER = False
 
@@ -120,7 +120,7 @@ class scheduler:
             self.delete()
             return
 
-        import numflow as nf
+        import numpipe as nf
         nf._tqdm_mininterval = self.args.tqdm
         
         if not self.args.at_end:

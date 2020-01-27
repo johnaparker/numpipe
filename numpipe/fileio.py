@@ -4,7 +4,7 @@ Code related to file io:
 """
 
 import h5py
-from numflow.utility import Bunch
+from numpipe.utility import Bunch
 
 def load_symbols(filepath):
     """Load all symbols from h5 filepath"""

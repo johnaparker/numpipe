@@ -1,6 +1,6 @@
 import numpy as np
 from random import random
-from numflow import scheduler
+from numpipe import scheduler
 import os
 
 ### Setup

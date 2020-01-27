@@ -1,4 +1,4 @@
-from numflow import scheduler, once
+from numpipe import scheduler, once
 import numpy as np
 import matplotlib.pyplot as plt
 

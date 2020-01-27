@@ -6,7 +6,7 @@ import os
 import h5py
 import numpy as np
 from typing import Iterable
-from numflow.fileio import load_symbols, write_symbols
+from numpipe.fileio import load_symbols, write_symbols
 
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""

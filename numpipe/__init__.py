@@ -1,5 +1,5 @@
 """
-numflow
+numpipe
 =======
 """
 
@@ -13,7 +13,7 @@ from . import parser
 from . import display
 
 from .utility import once
-from .numflow import scheduler
+from .numpipe import scheduler
 
 from tqdm import tqdm as tq
 _tqdm_mininterval = .1

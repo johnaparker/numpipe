@@ -1,4 +1,4 @@
-from numflow import scheduler
+from numpipe import scheduler
 from time import sleep
 
 ### Setup
