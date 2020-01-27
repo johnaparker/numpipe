@@ -57,21 +57,25 @@ def delete_message(filepaths):
     else:
         return False
 
-def display_message(cached_functions, instances, instance_functions, at_end_functions):
+def display_message(blocks, instances, at_end_functions):
     """Message to shown when 'display' command is run
     
     Arguments:
     """
 
     print(colored("cached functions:", color='yellow', attrs=['bold']))
-    for name,func in cached_functions.items():
+    for name, block in blocks.items():
+        func = block.deferred_function
+        if func.__name__ in instances:
+            continue
         print('    ', colored(name, color='yellow'), ' -- ', func.__doc__, sep='')
 
-    for base,instance in instances.items():
-        print('    ', colored(base, color='yellow'), ' -- ', instance_functions[base].__doc__, sep='')
-        print('      ', f'[{len(instance)} instances] ', end='')
-        for name, func in instance.items():
-            subname = name.split('-')[1]
+    for name, labels in instances.items():
+        func = blocks[labels[0]].deferred_function
+        print('    ', colored(name, color='yellow'), ' -- ', func.__doc__, sep='')
+        print('      ', f'[{len(labels)} instances] ', end='')
+        for label in labels:
+            subname = label.split('-')[1]
             print(subname, end=' ')
         print('')
 

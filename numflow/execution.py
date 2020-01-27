@@ -9,13 +9,12 @@ from numflow.fileio import load_symbols, write_symbols
 
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
-    def __init__(self, function, name, args=(), kwargs={}, num_iterations=None):
+    def __init__(self, function, args=(), kwargs={}, num_iterations=None):
         self.function = function
         self.args = args
         self.kwargs = kwargs
         self.__name__ = function.__name__ 
         self.__doc__  = function.__doc__ 
-        self.name = name
 
         # self.arg = first_argument(name, num_iterations=num_iterations)
 
@@ -60,3 +59,10 @@ class target:
     def remove(self):
         os.remove(self.filepath)
 
+class block:
+    """
+    A (execution) block consists of a deffered function and a target
+    """
+    def __init__(self, deferred_function, target):
+        self.deferred_function = deferred_function
+        self.target = target

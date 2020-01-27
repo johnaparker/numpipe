@@ -22,7 +22,7 @@ from mpi4py import MPI
 import subprocess
 
 from numflow import slurm, display
-from numflow.execution import deferred_function, target
+from numflow.execution import deferred_function, target, block
 from numflow.utility import doublewrap, once
 from numflow.parser import run_parser
 from numflow.h5cache import h5cache
@@ -34,13 +34,9 @@ class scheduler:
     """Deferred function evaluation and access to cached function output"""
 
     def __init__(self, dirpath=None):
-        self.cached_functions = dict()
-        self.at_end_functions = dict()
-        self.targets = dict()
+        self.blocks = dict()
         self.instances = dict()
-        self.instance_functions = dict()
-        self.instance_iterations = dict()
-        self.instance_counts = dict() 
+        self.at_end_functions = dict()
 
         if dirpath is None:
             self.dirpath = sys.path[0]
@@ -77,13 +73,13 @@ class scheduler:
 
         func_name = function.__name__
 
-        if func_name in self.instance_functions.keys():
+        if func_name in self.instances.keys():
             if instance is None:
                 class load_next:
-                    def __init__(self, instances, targets):
-                        self.length = len(instances[func_name].keys())
-                        self.instances = iter(instances[func_name].keys())
-                        self.targets = targets
+                    def __init__(self, labels, blocks):
+                        self.length = len(labels)
+                        self.labels = iter(labels)
+                        self.blocks = blocks
 
                     def __len__(self): 
                         return self.length
@@ -92,26 +88,22 @@ class scheduler:
                         return self
 
                     def __next__(self):
-                        target_name = next(self.instances)
-                        instance_name = target_name[target_name.find('-')+1:]
-                        return (instance_name, self.targets[target_name].load())
+                        label = next(self.labels)
+                        name = label[label.find('-')+1:]
+                        return (name, self.blocks[label].target.load())
 
-                return load_next(self.instances, self.targets)
+                labels = self.get_labels(func_name)
+                return load_next(labels, self.blocks)
 
             else:
-                target_name = f'{func_name}-{instance}'
+                label = f'{func_name}-{instance}'
         else:
-            target_name = func_name
+            label = func_name
 
-        return self.targets[target_name].load()
+        return self.blocks[label].target.load()
 
-
-    def execute(self, store=None):
-        """Run the requested cached functions and at-end functions
-           
-           Arguments:
-               store       {name: data} dictionary to write as additional data (optional)
-        """
+    def execute(self):
+        """Run the requested cached functions and at-end functions"""
         self.args = run_parser()
 
         ### display only event
@@ -120,95 +112,31 @@ class scheduler:
             return
 
         if self.args.action == 'clean':
-            pathlist = pathlib.Path(self.dirpath).glob(f'{self.filename}-*.h5')
-            current = [target.filepath for target in self.targets.values()]
+            self.clean()
+            return
 
-            filepaths = []
-            for path in pathlist:
-                path_str = str(path)
-                if path_str not in current:
-                    filepaths.append(path_str)
-
-            confirm = self._clean(filepaths)
-            if not confirm:
-                display.abort_message()
+        if self.args.delete is not None:
+            self.delete()
             return
 
         import numflow as nf
         nf._tqdm_mininterval = self.args.tqdm
         
         if not self.args.at_end:
-            ### determine which cahced data to delete
-            functions_to_delete = dict()
-            if self.args.delete is not None:
-                if len(self.args.delete) == 0:
-                    functions_to_delete.update(self.cached_functions)
-                    for instances in self.instances.values():
-                        functions_to_delete.update(instances)
-                else:
-                    for name in self.args.delete:
-                        if name in self.cached_functions.keys():
-                            functions_to_delete[name] = self.cached_functions[name]
-                        elif name in self.instances.keys():
-                            functions_to_delete.update(self.instances[name])
-                        else:
-                            try:
-                                base = name.split('-')[0]
-                                functions_to_delete[name] = self.instances[base][name]
-                            except KeyError:
-                                raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
-
-                if self.mpi_rank == 0:
-                    overwriten = self._overwrite(names=functions_to_delete.keys())
-                    if not overwriten:
-                        display.abort_message()
-
-                return
-
-            ### write store to file
-            if store is not None:
-                with h5py.File('store.h5', 'w') as f:
-                    for name,value in store.items():
-                        f[name] = value
-
             ### determine which functions to execute based on file and command line
-            functions_to_execute = dict()
             if self.args.rerun is None:
-                for name,func in self.cached_functions.items():
-                    if not self.targets[name].exists():
-                        functions_to_execute[name] = func
-
-                for base,instances in self.instances.items():
-                    for name,instance in instances.items():
-                        if not self.targets[name].exists():
-                            functions_to_execute[name] = instance
-
+                blocks_to_execute = {name: block for name, block in self.blocks.items() if not block.target.exists()}
             elif len(self.args.rerun) == 0:
-                functions_to_execute.update(self.cached_functions)
-                for instances in self.instances.values():
-                    functions_to_execute.update(instances)
-
+                blocks_to_execute = self.blocks
             else:
+                blocks_to_execute = dict()
                 for name in self.args.rerun:
-                    if name[-3:] == '.h5':
-                        actual_name = name[name.find('-')+1:-3]
-                    else:
-                        actual_name = name
-
-                    if actual_name in self.cached_functions.keys():
-                        functions_to_execute[actual_name] = self.cached_functions[actual_name]
-                    elif actual_name in self.instances.keys():
-                        functions_to_execute.update(self.instances[actual_name])
-                    else:
-                        try:
-                            base = actual_name.split('-')[0]
-                            functions_to_execute[actual_name] = self.instances[base][actual_name]
-                        except KeyError:
-                            raise ValueError(f"Invalid argument: function '{actual_name}' does not correspond to any cached function")
+                    labels = self.get_labels(name)
+                    blocks_to_execute.update({label: self.blocks[label] for label in labels})
 
             aborting = False
             if self.mpi_rank == 0:
-                overwriten = self._overwrite(names=functions_to_execute.keys())
+                overwriten = self._overwrite([block.target for block in blocks_to_execute.values()])
                 if not overwriten:
                     aborting = True
                     display.abort_message()
@@ -217,10 +145,10 @@ class scheduler:
                 return
 
             if self.args.action == 'slurm':
-                ntasks = len(functions_to_execute)
-                slurm.create_lookup(self.filename, functions_to_execute.keys())
+                ntasks = len(blocks_to_execute)
+                slurm.create_lookup(self.filename, blocks_to_execute.keys())
 
-                sbatch_filename = slurm.create_sbatch(self.filename, functions_to_execute.keys(), 
+                sbatch_filename = slurm.create_sbatch(self.filename, blocks_to_execute.keys(), 
                         time=self.args.time, memory=self.args.memory)
                 wall_time = slurm.wall_time(self.args.time)
 
@@ -229,10 +157,10 @@ class scheduler:
 
             ### execute all items
             with Pool(processes=self.args.processes) as pool:
-                # for name, func in functions_to_execute.items():
-                    # pool.apply_async(self._execute_function, (func,name))
+                # for name, block in blocks_to_execute.items():
+                    # pool.apply_async(self._execute_block, (block,name))
 
-                results = [pool.apply_async(self._execute_function, (func,name)) for name,func in functions_to_execute.items()]
+                results = [pool.apply_async(self._execute_block, (block,name)) for name,block in blocks_to_execute.items()]
                 # while results:
                     # for result in results:
                         # if result.ready():
@@ -287,21 +215,21 @@ class scheduler:
                 print('progress sent')
 
     # @yield_traceback
-    def _execute_function(self, func, name):
+    def _execute_block(self, block, name):
         try:
+            func = block.deferred_function
             if self.mpi_rank == 0:
                 display.cached_function_message(name)
-                if func.__name__ in self.instances.keys():   ### write arguments if instance funcitont 
-                    instance = self.instances[func.__name__]
-                    df = instance[name]
-                    self.targets[name].write_args(df.kwargs)
+                if func.__name__ in self.instances and name in self.instances[func.__name__]:
+                    ### write arguments if instance funcitont 
+                    block.target.write_args(func.kwargs)
 
             MPI.COMM_WORLD.Barrier()
             symbols = func()
 
             ### Generator functions
             if isinstance(symbols, types.GeneratorType):
-                cache = h5cache(self.targets[name].filepath, cache_time=self.args.cache_time)
+                cache = h5cache(block.target.filepath, cache_time=self.args.cache_time)
 
                 ### iterate over all symbols, caching each one
                 for next_symbols in symbols:
@@ -334,15 +262,15 @@ class scheduler:
         Add an instance (a function with specified kwargs)
         """
         if instance_name is None:
-            instance_name = str(self.instance_counts[func.__name__])
-            self.instance_counts[func.__name__] += 1
+            instance_name = str(len(self.instances[func.__name__]))
 
-        func_name = f'{func.__name__}-{instance_name}'
-        filepath = f'{self.dirpath}/{self.filename}-{func_name}.h5'
+        block_name = f'{func.__name__}-{instance_name}'
+        filepath = f'{self.dirpath}/{self.filename}-{block_name}.h5'
         
-        self.targets[func_name] = target(filepath)
-        num_iterations = self.instance_iterations[func.__name__]
-        self.instances[func.__name__][func_name] = deferred_function(func, func_name, kwargs=kwargs, num_iterations=num_iterations)
+        self.blocks[block_name] = block(
+                          deferred_function(func, kwargs=kwargs, num_iterations=None),
+                          target(filepath))
+        self.instances[func.__name__].append(block_name)
 
     def add_instances(self, func, instances):
         """
@@ -360,20 +288,18 @@ class scheduler:
         """decorator to add a cached function to be conditionally ran"""
         sig = signature(func)
         if len(sig.parameters) == 0:
-            self.cached_functions[func.__name__] = deferred_function(func, func.__name__, num_iterations=iterations)
             filepath = f'{self.dirpath}/{self.filename}-{func.__name__}.h5'
-            self.targets[func.__name__] = target(filepath)
+            self.blocks[func.__name__] = block(
+                        deferred_function(func, num_iterations=iterations),
+                        target(filepath))
         else:
-            self.instances[func.__name__] = {}
-            self.instance_functions[func.__name__] = func
-            self.instance_iterations[func.__name__] = iterations
-            self.instance_counts[func.__name__] = 0
+            self.instances[func.__name__] = []
 
         return func
 
     def at_end(self, func):
         """decorator to add a function to be executed at the end"""
-        self.at_end_functions[func.__name__] = deferred_function(func, func.__name__)
+        self.at_end_functions[func.__name__] = deferred_function(func)
         return func
 
     def shared(self, class_type):
@@ -383,14 +309,14 @@ class scheduler:
     def display_functions(self):
         if not self.mpi_rank == 0:
             return
-        display.display_message(self.cached_functions, self.instances, self.instance_functions, self.at_end_functions)
+        display.display_message(self.blocks, self.instances, self.at_end_functions)
 
     def _write_symbols(self, name, symbols):
         """write symbols to cache inside group"""
         if not self.mpi_rank == 0:
             return
 
-        self.targets[name].write(symbols)
+        self.blocks[name].target.write(symbols)
 
     def _clean(self, filepaths):
         """clean a set of filepaths
@@ -413,20 +339,17 @@ class scheduler:
 
         return True
 
-    def _overwrite(self, names):
+    def _overwrite(self, targets):
         """Request if existing hdf5 file should be overwriten, return True if data is deleted
 
            Argumnets: 
-               names        list of group names to check
+               targets        list of targets to delete
         """
         if not self.mpi_rank == 0:
             return
 
-        filepaths = []
-        
-        if names:
-            data_to_delete = (filter(lambda name: self.targets[name].exists(), names))
-            filepaths = [self.targets[data].filepath for data in data_to_delete]
+        targets_to_delete = list(filter(lambda t: t.exists(), targets))
+        filepaths = [target.filepath for target in targets_to_delete]
 
         if filepaths:
             if not self.args.force:
@@ -435,7 +358,54 @@ class scheduler:
                 if not delete:
                     return False
 
-            for filepath in filepaths:
-                os.remove(filepath)
+        for target in targets_to_delete:
+            target.remove()
 
         return True
+
+    def get_labels(self, name):
+        """get a list of block labels for a given name"""
+        if name in self.blocks.keys():
+            return [name]
+        elif name in self.instances.keys():
+            return self.instances[name]
+        elif name[-3:] == '.h5':
+            actual_name = name[name.find('-')+1:-3]
+            if actual_name in self.blocks.keys():
+                return [actual_name]
+
+        raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
+
+    def delete(self):
+        """
+        delete target data
+        """
+        targets_to_delete = []
+
+        if len(self.args.delete) == 0:
+            targets_to_delete.extend([block.target for block in self.blocks])
+        else:
+            for name in self.args.delete:
+                labels = self.get_labels(name)
+                targets_to_delete.extend([self.blocks[label].target for label in labels])
+
+        if self.mpi_rank == 0:
+            overwriten = self._overwrite(targets_to_delete)
+            if not overwriten:
+                display.abort_message()
+
+        return
+
+    def clean(self):
+        pathlist = pathlib.Path(self.dirpath).glob(f'{self.filename}-*.h5')
+        current = [block.target.filepath for block in self.blocks.values()]
+
+        filepaths = []
+        for path in pathlist:
+            path_str = str(path)
+            if path_str not in current:
+                filepaths.append(path_str)
+
+        confirm = self._clean(filepaths)
+        if not confirm:
+            display.abort_message()
