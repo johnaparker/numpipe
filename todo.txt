@@ -7,6 +7,9 @@ dependency:
 parallel execution with a single h5 file (not add_instance)
 
 experiment with Telegram bot 
+    * plot-related command line arguments (--no-show, --no-delay, --show fig_number, --pdf_pages, --save, --theme {dark})
+    * RCC: can we add a single python --at-end call that runs after all others have finished? (runs with --no-show and --no-delay)
+    * deal with multiple @plots
 
 h5cache: max_memory across all npcaches, npcaches need to concatenate some minimum size
 

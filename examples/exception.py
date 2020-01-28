@@ -7,22 +7,22 @@ job = scheduler()
 N = 10
 T = .5
 
-@job.cache(iterations=N)
-def first(self):
-    for i in self.iterations():
+@job.cache()
+def first():
+    for i in range(N):
         sleep(T/N)
 
     return {}
 
 @job.cache
-def second(self):
+def second():
     x = 1/0
     return {}
 
 
-@job.cache(iterations=N)
-def third(self):
-    for i in self.iterations():
+@job.cache()
+def third():
+    for i in range(N):
         sleep(T/N)
 
     return {}

@@ -3,10 +3,18 @@ Execution of functions
 """
 
 import os
+import sys
 import h5py
 import numpy as np
 from typing import Iterable
+import traceback
+from mpi4py import MPI
+import types
+
 from numpipe.fileio import load_symbols, write_symbols
+from numpipe import display
+from numpipe.h5cache import h5cache
+from numpipe.utility import once
 
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
@@ -77,3 +85,46 @@ class block:
             self.dependencies = None
 
         self.complete = False
+
+# @yield_traceback
+def execute_block(block, name, mpi_rank, instances, cache_time):
+    try:
+        func = block.deferred_function
+        if mpi_rank == 0:
+            display.cached_function_message(name)
+            if func.__name__ in instances and name in instances[func.__name__]:
+                ### write arguments if instance funcitont 
+                block.target.write_args(func.kwargs)
+
+        MPI.COMM_WORLD.Barrier()
+        symbols = func()
+
+        ### Generator functions
+        if isinstance(symbols, types.GeneratorType):
+            cache = h5cache(block.target.filepath, cache_time=cache_time)
+
+            ### iterate over all symbols, caching each one
+            for next_symbols in symbols:
+                if mpi_rank == 0:
+                    if type(next_symbols) is once:
+                        block.target.write(next_symbols)
+                    else:
+                        for symbol_name, next_symbol in next_symbols.items():
+                            cache.add(symbol_name, next_symbol)
+
+            ### empty any of the remaining cache
+            if mpi_rank == 0:
+                cache.flush()
+
+        ### Standard Functions
+        else:
+            if isinstance(symbols, dict):
+                block.target.write(symbols)
+            elif symbols is None:
+                block.target.write(dict())
+            else:
+                raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
+
+    except:
+        raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
+

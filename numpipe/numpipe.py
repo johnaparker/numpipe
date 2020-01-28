@@ -10,23 +10,22 @@ import h5py
 import os
 import sys
 import pathlib
-import types
 from inspect import signature
 from multiprocessing import Pool, Value
 import threading
-import traceback
 import socket
 import pickle
 import numpy as np
 from mpi4py import MPI
 import subprocess
-from time import sleep
+from time import sleep, time
+from functools import partial
+import matplotlib.pyplot as plt
 
-from numpipe import slurm, display
-from numpipe.execution import deferred_function, target, block
-from numpipe.utility import doublewrap, once
+from numpipe import slurm, display, notify
+from numpipe.execution import deferred_function, target, block, execute_block
+from numpipe.utility import doublewrap
 from numpipe.parser import run_parser
-from numpipe.h5cache import h5cache
 from numpipe.networking import recv_msg,send_msg
 
 USE_SERVER = False
@@ -60,6 +59,7 @@ class scheduler:
 
         self.complete = False
         self.mpi_rank = MPI.COMM_WORLD.Get_rank()
+        self.notifications = []
 
     #TODO implement load all, jdefer
     def load(self, function=None, instance=None, defer=False):
@@ -123,6 +123,7 @@ class scheduler:
         import numpipe as nf
         nf._tqdm_mininterval = self.args.tqdm
         
+        self.num_blocks_executed = 0
         if not self.args.at_end:
             ### determine which functions to execute based on file and command line
             if self.args.rerun is None:
@@ -135,6 +136,7 @@ class scheduler:
                     labels = self.get_labels(name)
                     blocks_to_execute.update({label: self.blocks[label] for label in labels})
 
+            self.num_blocks_executed = len(blocks_to_execute)
             aborting = False
             if self.mpi_rank == 0:
                 overwriten = self._overwrite([block.target for block in blocks_to_execute.values()])
@@ -146,17 +148,18 @@ class scheduler:
                 return
 
             if self.args.action == 'slurm':
-                ntasks = len(blocks_to_execute)
                 slurm.create_lookup(self.filename, blocks_to_execute.keys())
 
                 sbatch_filename = slurm.create_sbatch(self.filename, blocks_to_execute.keys(), 
                         time=self.args.time, memory=self.args.memory)
                 wall_time = slurm.wall_time(self.args.time)
 
-                display.slurm_message(sbatch_filename, wall_time, ntasks, self.args.no_submit)
+                display.slurm_message(sbatch_filename, wall_time, self.num_blocks_executed, self.args.no_submit)
                 return
 
             ### execute all items
+            t_start = time()
+            num_exceptions = 0
             with Pool(processes=self.args.processes) as pool:
                 results = dict()
                 remaining = list(blocks_to_execute.keys())
@@ -165,7 +168,8 @@ class scheduler:
                     for name in remaining:
                         block = blocks_to_execute[name]
                         if self.ready_to_run(block):
-                            results[name] = pool.apply_async(self._execute_block, (block, name))
+                            results[name] = pool.apply_async(execute_block, 
+                                    (block, name, self.mpi_rank, self.instances, self.args.cache_time))
                             to_delete.append(name)
 
                     for name in to_delete:
@@ -177,6 +181,7 @@ class scheduler:
                             try:
                                 result.get()
                             except Exception as e:
+                                num_exceptions += 1
                                 print(e)  # failed simulation; print instead of abort
 
                             self.blocks[name].complete = True
@@ -195,6 +200,13 @@ class scheduler:
                 pool.join()
                 
                 self.complete = True
+
+                if blocks_to_execute and self.mpi_rank == 0:
+                    self.notifications.append(partial(notify.send_finish_message,
+                                                filename=self.filename, 
+                                                njobs=len(blocks_to_execute),
+                                                time=time() - t_start,
+                                                num_exceptions=num_exceptions))
                 
                 if USE_SERVER:
                     t.join()
@@ -234,48 +246,6 @@ class scheduler:
                 # acquire lock on pipe
                 send_msg(self.pipe, pickle.dumps(int_dict))
                 print('progress sent')
-
-    # @yield_traceback
-    def _execute_block(self, block, name):
-        try:
-            func = block.deferred_function
-            if self.mpi_rank == 0:
-                display.cached_function_message(name)
-                if func.__name__ in self.instances and name in self.instances[func.__name__]:
-                    ### write arguments if instance funcitont 
-                    block.target.write_args(func.kwargs)
-
-            MPI.COMM_WORLD.Barrier()
-            symbols = func()
-
-            ### Generator functions
-            if isinstance(symbols, types.GeneratorType):
-                cache = h5cache(block.target.filepath, cache_time=self.args.cache_time)
-
-                ### iterate over all symbols, caching each one
-                for next_symbols in symbols:
-                    if self.mpi_rank == 0:
-                        if type(next_symbols) is once:
-                            self._write_symbols(name, next_symbols)
-                        else:
-                            for symbol_name, next_symbol in next_symbols.items():
-                                cache.add(symbol_name, next_symbol)
-
-                ### empty any of the remaining cache
-                if self.mpi_rank == 0:
-                    cache.flush()
-
-            ### Standard Functions
-            else:
-                if isinstance(symbols, dict):
-                    self._write_symbols(name, symbols)
-                elif symbols is None:
-                    self._write_symbols(name, dict())
-                else:
-                    raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
-
-        except:
-            raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
     # @static_vars(counter=0)
     def add_instance(self, func, instance_name=None, **kwargs):
@@ -324,6 +294,33 @@ class scheduler:
         self.at_end_functions[func.__name__] = deferred_function(func)
         return func
 
+    def plots(self, func):
+        """decorator to add a function to be executed at the end for plotting purposes"""
+
+        def wrap():
+            show_copy = plt.show
+            plt.show = lambda: None
+            func()
+            if self.num_blocks_executed > 0 and self.mpi_rank == 0:
+                self.notifications.append(partial(notify.send_images,
+                                            filename=self.filename))
+
+            self.send_notifications()
+
+            plt.show = show_copy
+            plt.show()
+
+        self.at_end_functions[func.__name__] = deferred_function(wrap)
+
+        return wrap
+
+    def send_notifications(self):
+        if self.mpi_rank == 0:
+            t = threading.Thread(target=partial(notify.send_notifications, 
+                                           notifications=self.notifications,
+                                           delay=self.args.notify_delay))
+            t.start()
+
     def shared(self, class_type):
         """decorator to add a class for shared variables"""
         return class_type
@@ -332,13 +329,6 @@ class scheduler:
         if not self.mpi_rank == 0:
             return
         display.display_message(self.blocks, self.instances, self.at_end_functions)
-
-    def _write_symbols(self, name, symbols):
-        """write symbols to cache inside group"""
-        if not self.mpi_rank == 0:
-            return
-
-        self.blocks[name].target.write(symbols)
 
     def _clean(self, filepaths):
         """clean a set of filepaths

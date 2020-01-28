@@ -11,6 +11,8 @@ from . import fileio
 from . import execution
 from . import parser
 from . import display
+from . import notify
+from . import config
 
 from .utility import once
 from .numpipe import scheduler
