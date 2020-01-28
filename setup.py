@@ -26,6 +26,8 @@ def read(fname):
 def post_install():
     config_str = """
 [notifications]
+    default_delay = 120
+
     [notifications.telegram]
     token = ""
     chat_id = 0
