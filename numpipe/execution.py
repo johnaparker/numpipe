@@ -10,6 +10,9 @@ from typing import Iterable
 import traceback
 from mpi4py import MPI
 import types
+from functools import partial
+import numpipe
+import tqdm
 
 from numpipe.fileio import load_symbols, write_symbols
 from numpipe import display
@@ -87,7 +90,10 @@ class block:
         self.complete = False
 
 # @yield_traceback
-def execute_block(block, name, mpi_rank, instances, cache_time):
+def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position):
+    numpipe.tqdm = partial(numpipe.tqdm, position=tqdm_position, desc=name)
+    tqdm.tqdm= partial(numpipe.tqdm, position=tqdm_position, desc=name)
+
     try:
         func = block.deferred_function
         if mpi_rank == 0:

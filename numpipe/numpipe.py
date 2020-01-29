@@ -169,7 +169,7 @@ class scheduler:
                         block = blocks_to_execute[name]
                         if self.ready_to_run(block):
                             results[name] = pool.apply_async(execute_block, 
-                                    (block, name, self.mpi_rank, self.instances, self.args.cache_time))
+                                    (block, name, self.mpi_rank, self.instances, self.args.cache_time, len(results)))
                             to_delete.append(name)
 
                     for name in to_delete:
