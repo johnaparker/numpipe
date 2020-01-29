@@ -25,6 +25,10 @@ def run_parser():
         p.add_argument('--tqdm', type=float, default=.1, help='time (in seconds) for tqdm mininterval argument')
         p.add_argument('--notify-delay', type=float, default=notifications_default_delay, help='time (in seconds) before notifications will be sent')
 
+        p.add_argument('--theme', default='normal', type=str, help='matplotlib plot theme')
+        p.add_argument('--save', nargs='?', default='', type=str, help='save all figures')
+        # p.add_argument('--theme', choices=['classic', 'dark'], default='classic', help='matplotlib plot theme')
+
 
     slurm_parse.add_argument('-t', '--time', type=str, default='36', help='maximum run-time for the Slurm job, formated as {hours}:{minutes}:{seconds} (minutes and seconds optional)')
     slurm_parse.add_argument('-m', '--memory', type=float, default=2, help='maximum memory per cpu for the Slurm job in GB')

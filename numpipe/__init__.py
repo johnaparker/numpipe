@@ -13,6 +13,7 @@ from . import parser
 from . import display
 from . import notify
 from . import config
+from . import mpl_tools
 
 from .utility import once
 from .numpipe import scheduler

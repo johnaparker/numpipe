@@ -22,7 +22,7 @@ from time import sleep, time
 from functools import partial
 import matplotlib.pyplot as plt
 
-from numpipe import slurm, display, notify
+from numpipe import slurm, display, notify, mpl_tools
 from numpipe.execution import deferred_function, target, block, execute_block
 from numpipe.utility import doublewrap
 from numpipe.parser import run_parser
@@ -300,12 +300,16 @@ class scheduler:
         def wrap():
             show_copy = plt.show
             plt.show = lambda: None
+            mpl_tools.set_theme(self.args.theme)
+
             func()
             if self.num_blocks_executed > 0 and self.mpi_rank == 0:
                 self.notifications.append(partial(notify.send_images,
                                             filename=self.filename))
 
             self.send_notifications()
+            if self.args.save != '':
+                mpl_tools.save_figures(self.filename, self.args.save)
 
             plt.show = show_copy
             plt.show()
