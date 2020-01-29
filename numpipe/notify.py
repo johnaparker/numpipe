@@ -7,7 +7,7 @@ from numpipe import config
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                      level=logging.INFO)
 
-DEFAULT_DELAY = config.get_config()['notifications']['default_deley']
+DEFAULT_DELAY = config.get_config()['notifications']['default_delay']
 
 def get_bot_token():
     return config.get_config()['notifications']['telegram']['token']

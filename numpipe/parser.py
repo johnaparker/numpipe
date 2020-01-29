@@ -4,7 +4,7 @@ Defines the argument parser
 import argparse
 from numpipe import config
 
-notifications_default_delay = config.get_config()['notifications']['default_deley']
+notifications_default_delay = config.get_config()['notifications']['default_delay']
 
 def run_parser():
     parser = argparse.ArgumentParser()
