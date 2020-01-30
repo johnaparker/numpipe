@@ -18,6 +18,11 @@ REQUIRED = [
     'numpy', 
     'h5py', 
     'termcolor', 
+    'toml',
+    'matplotlib',
+    'tqdm',
+    'mpi4py',
+    'python-telegram-bot',
 ]
 
 def read(fname):
