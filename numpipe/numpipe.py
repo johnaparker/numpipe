@@ -309,9 +309,11 @@ class scheduler:
 
             self.send_notifications()
             if self.args.save != '':
-                mpl_tools.save_figures(self.filename, self.args.save)
+                mpl_tools.save_figures(self.filename, self.args.save, self.args.figures)
 
             plt.show = show_copy
+            if self.args.figures is not None:
+                [plt.close(plt.figure(i)) for i in plt.get_fignums() if i not in self.args.figures]
             plt.show()
 
         self.at_end_functions[func.__name__] = deferred_function(wrap)
