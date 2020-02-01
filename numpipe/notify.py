@@ -63,7 +63,12 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
     cid = fig.canvas.mpl_connect('motion_notify_event', on_mouse_movement)
     cid = fig.canvas.mpl_connect('key_press_event', on_key_press)
 
-    sleep(.1)
+    t_start = time()
+    while time() - t_start < 1:
+        sleep(.01)
+        if not plt.get_fignums():
+            return
+
     x0 = fig.canvas.manager.window.x()
     y0 = fig.canvas.manager.window.y()
     w0 = fig.canvas.manager.window.size()
