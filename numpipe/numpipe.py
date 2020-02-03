@@ -22,6 +22,7 @@ from time import sleep, time
 from functools import partial
 from typing import Iterable, types
 import matplotlib.pyplot as plt
+import traceback
 
 from numpipe import slurm, display, notify, mpl_tools
 from numpipe.execution import deferred_function, target, block, execute_block
@@ -182,9 +183,9 @@ class scheduler:
                         if result.ready():
                             try:
                                 result.get()
-                            except Exception as e:
+                            except Exception as err:
                                 num_exceptions += 1
-                                print(e)  # failed simulation; print instead of abort
+                                traceback.print_exception(type(err), err, err.__traceback__)
 
                             self.blocks[name].complete = True
                             to_delete.append(name)
@@ -303,12 +304,18 @@ class scheduler:
             plt.show = lambda: None
             mpl_tools.set_theme(self.args.theme)
 
-            ret = func()
-            if isinstance(ret, types.GeneratorType):
-                for anim in ret:
-                    self.add_animation(anim)
-            elif ret is not None:
-                self.add_animation(ret)
+            try:
+                ret = func()
+                if isinstance(ret, types.GeneratorType):
+                    for anim in ret:
+                        self.add_animation(anim)
+                elif ret is not None:
+                    self.add_animation(ret)
+            except Exception as err:
+                traceback.print_exception(type(err), err, err.__traceback__)
+                self.notifications.append(partial(notify.send_message,
+                                message='`@plots` threw an error, some images may not be sent'))
+
             animated_figs = self.animations.keys()
 
             if self.args.save_figs != '' or self.args.save != '':

@@ -58,6 +58,12 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
     cid = fig.canvas.mpl_connect('motion_notify_event', on_mouse_movement)
     cid = fig.canvas.mpl_connect('key_press_event', on_key_press)
 
+    t_start = time()
+    while time() - t_start < 1:
+        sleep(.01)
+        if not plt.get_fignums():
+            return
+
     x0 = fig.canvas.manager.window.x()
     y0 = fig.canvas.manager.window.y()
     w0 = fig.canvas.manager.window.size()
@@ -86,8 +92,11 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
 
     return True
 
-def send_finish_message(filename, njobs, time, num_exceptions):
+def send_message(message):
     bot = telegram.Bot(token=get_bot_token())
+    bot.send_message(chat_id=get_chat_id(), text=message, parse_mode=telegram.ParseMode.MARKDOWN)
+
+def send_finish_message(filename, njobs, time, num_exceptions):
     host = socket.gethostname()
     time_str = generate_time_str(time)
     tab = '    '
@@ -107,7 +116,7 @@ def send_finish_message(filename, njobs, time, num_exceptions):
 {tab}runtime____{time_str}
 {tab}date_______{date}`
 '''
-    bot.send_message(chat_id=get_chat_id(), text=text, parse_mode=telegram.ParseMode.MARKDOWN)
+    send_message(text)
 
 def send_images(filename, exempt=[]):
     if not plt.get_fignums():
