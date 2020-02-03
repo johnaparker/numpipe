@@ -20,6 +20,7 @@ from mpi4py import MPI
 import subprocess
 from time import sleep, time
 from functools import partial
+from typing import Iterable, types
 import matplotlib.pyplot as plt
 
 from numpipe import slurm, display, notify, mpl_tools
@@ -37,6 +38,7 @@ class scheduler:
         self.blocks = dict()
         self.instances = dict()
         self.at_end_functions = dict()
+        self.animations =dict() 
 
         if dirpath is None:
             self.dirpath = sys.path[0]
@@ -296,16 +298,24 @@ class scheduler:
 
     def plots(self, func):
         """decorator to add a function to be executed at the end for plotting purposes"""
-
         def wrap():
             show_copy = plt.show
             plt.show = lambda: None
             mpl_tools.set_theme(self.args.theme)
 
-            func()
-            if self.num_blocks_executed > 0 and self.mpi_rank == 0:
+            ret = func()
+            if isinstance(ret, types.GeneratorType):
+                for anim in ret:
+                    self.add_animation(anim)
+            elif ret is not None:
+                self.add_animation(ret)
+
+            if self.num_blocks_executed > 0:
+                animated_figs = self.animations.keys()
                 self.notifications.append(partial(notify.send_images,
-                                            filename=self.filename))
+                                            filename=self.filename, exempt=animated_figs))
+                self.notifications.append(partial(notify.send_videos,
+                                            anims=self.animations.values()))
 
             self.send_notifications()
             if self.args.save != '':
@@ -319,6 +329,22 @@ class scheduler:
         self.at_end_functions[func.__name__] = deferred_function(wrap)
 
         return wrap
+
+    def add_animation(self, anim):
+        """add an animation to the saved animations"""
+
+        def add_single_animation(anim):
+            key = anim._fig.number
+            if key in self.animations:
+                self.animations[key].append(anim)
+            else:
+                self.animations[key] = [anim]
+
+        if isinstance(anim, Iterable): 
+            for a in anim:
+                add_single_animation(a)
+        else:
+            add_single_animation(anim)
 
     def send_notifications(self):
         if self.mpi_rank == 0:

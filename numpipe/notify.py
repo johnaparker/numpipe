@@ -1,11 +1,10 @@
 import telegram
-import logging
 import socket
 from datetime import datetime
-from time import time
+from time import time, sleep
 from numpipe import config
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                     level=logging.INFO)
+import matplotlib.pyplot as plt
+from my_pytools.my_matplotlib.animation import save_animation
 
 DEFAULT_DELAY = config.get_config()['notifications']['default_delay']
 
@@ -45,9 +44,6 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
         delay         time (in seconds) to check before declaring idle
         check_every   time (in seconds) between interaction checks
     """
-    import matplotlib.pyplot as plt
-    from time import sleep
-
     mouse_moved = False
     key_pressed = False
     def on_mouse_movement(event):
@@ -62,12 +58,6 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
     fig = plt.figure(nfigures_before)
     cid = fig.canvas.mpl_connect('motion_notify_event', on_mouse_movement)
     cid = fig.canvas.mpl_connect('key_press_event', on_key_press)
-
-    t_start = time()
-    while time() - t_start < 1:
-        sleep(.01)
-        if not plt.get_fignums():
-            return
 
     x0 = fig.canvas.manager.window.x()
     y0 = fig.canvas.manager.window.y()
@@ -120,13 +110,23 @@ def send_finish_message(filename, njobs, time, num_exceptions):
 '''
     bot.send_message(chat_id=get_chat_id(), text=text, parse_mode=telegram.ParseMode.MARKDOWN)
 
-def send_images(filename):
-    from io import BytesIO
-    import matplotlib.pyplot as plt
+def send_images(filename, exempt=[]):
+    if not plt.get_fignums():
+        return
 
+    from io import BytesIO
+    bot = telegram.Bot(token=get_bot_token())
+    chat_id = get_chat_id()
+
+    bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.UPLOAD_PHOTO)
     media = []
+
+    num_figs = 0
     for i in plt.get_fignums():
         fig = plt.figure(i)
+        if fig.number in exempt:
+            continue
+
         caption = f'{filename}-fig{i}'
 
         bio = BytesIO()
@@ -134,13 +134,40 @@ def send_images(filename):
         fig.savefig(bio, format='png')
         bio.seek(0)
         media.append(telegram.InputMediaPhoto(bio, caption=caption))
+        plt.close(fig)
+
+        num_figs += 1
+        if num_figs == 10:
+            num_figs = 0
+            bot.send_media_group(chat_id, media=media)
+            media = []
+
+    if num_figs:
+        bot.send_media_group(chat_id, media=media)
+
+def send_videos(anims):
+    """send a set of animations
+
+    Arguments:
+        anims    list of lists of the animations (each embedded list must share the same figure)
+    """
+    if not anims:
+        return
+
+    import tempfile 
+    plt.close('all')
 
     bot = telegram.Bot(token=get_bot_token())
-    # bot.send_photo(get_chat_id(), photo=bio)
-    bot.send_media_group(get_chat_id(), media=media)
+    chat_id = get_chat_id()
 
-def send_video():
-    pass
+    with tempfile.TemporaryDirectory() as direc:
+        for i,anim_list in enumerate(anims):
+            plt.close(anim_list[0]._fig)
+            filepath = f'{direc}/vid{i}.mp4'
+            bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.UPLOAD_VIDEO)
+            anim_list[0].save(filepath, extra_anim=anim_list[1:])
+            # save_animation(anim_list, filepath)
+            bot.send_animation(chat_id, animation=open(filepath, 'rb'))
 
 def send_notifications(notifications, delay=DEFAULT_DELAY, check_idle=True, idle=False):
     if not notifications_active():
@@ -148,7 +175,7 @@ def send_notifications(notifications, delay=DEFAULT_DELAY, check_idle=True, idle
 
     if check_idle:
         idle = check_idle_matplotlib(delay=delay)
-
+    
     if idle:
         for notification in notifications:
             notification()
