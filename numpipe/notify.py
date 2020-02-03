@@ -8,15 +8,19 @@ import matplotlib.pyplot as plt
 DEFAULT_DELAY = config.get_config()['notifications']['default_delay']
 
 def get_bot_token():
+    """get bot token from config file"""
     return config.get_config()['notifications']['telegram']['token']
 
 def get_chat_id():
+    """get chat ID from config file"""
     return config.get_config()['notifications']['telegram']['chat_id']
 
 def notifications_active():
+    """check whether notifications can be sent based on the config file"""
     return get_bot_token() and get_chat_id()
 
 def generate_time_str(time):
+    """convert time (in seconds) to a text string"""
     hours = int(time // 60**2)
     minutes = int((time - hours*60**2) // 60)
     seconds = int((time - hours*60**2 - minutes*60) // 1)
@@ -96,10 +100,19 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
     return True
 
 def send_message(message):
+    """send a text message"""
     bot = telegram.Bot(token=get_bot_token())
     bot.send_message(chat_id=get_chat_id(), text=message, parse_mode=telegram.ParseMode.MARKDOWN)
 
 def send_finish_message(filename, njobs, time, num_exceptions):
+    """send a text message summarizing the jobs that ran
+
+    Arguments:
+        filename     name of the python file
+        njobs        number of jobs ran
+        time         runtime of the jobs
+        num_exceptions   number of jobs that threw exceptions
+    """
     host = socket.gethostname()
     time_str = generate_time_str(time)
     tab = '    '
@@ -122,6 +135,12 @@ def send_finish_message(filename, njobs, time, num_exceptions):
     send_message(text)
 
 def send_images(filename, exempt=[]):
+    """send images (from matplotlib)
+
+    Arguments:
+        filename     name of the python file (without .py extension)
+        exempt       (optional) a list of figure numbers to not send
+    """
     if not plt.get_fignums():
         return
 
@@ -129,10 +148,12 @@ def send_images(filename, exempt=[]):
     bot = telegram.Bot(token=get_bot_token())
     chat_id = get_chat_id()
 
-    bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.UPLOAD_PHOTO)
+    send_action = lambda: bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.UPLOAD_PHOTO)
+    send_action()
     media = []
 
     num_figs = 0
+    t_start = time()
     for i in plt.get_fignums():
         fig = plt.figure(i)
         if fig.number in exempt:
@@ -152,6 +173,10 @@ def send_images(filename, exempt=[]):
             num_figs = 0
             bot.send_media_group(chat_id, media=media)
             media = []
+
+        if time() - t_start > 7:
+            send_action()
+            t_start = time()
 
     if num_figs:
         bot.send_media_group(chat_id, media=media)
@@ -175,11 +200,47 @@ def send_videos(anims):
         for i,anim_list in enumerate(anims):
             plt.close(anim_list[0]._fig)
             filepath = f'{direc}/vid{i}.mp4'
-            bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.UPLOAD_VIDEO)
-            anim_list[0].save(filepath, extra_anim=anim_list[1:])
+            send_animation(bot, chat_id, anim_list, filepath)
             bot.send_animation(chat_id, animation=open(filepath, 'rb'))
 
+def send_animation(bot, chat_id, anim_list, filepath, *args, **kwargs):
+    """send a single animation for a given bot and chat_id
+
+    Arguments:
+        bot         telegram bot
+        chat_id     telgram chat id
+        anim_list   list of animations (belonging to the same figure)
+        filepath    filepath the animation will be saved to
+        *args       additional arguments to pass to anim.save
+        **kwargs    additional key-word arguments to pass to anim.save
+    """
+    anim  = anim_list[0]
+    send_action = lambda: bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.UPLOAD_VIDEO)
+
+    store_func = anim._func
+    t_start = time()
+    send_action()
+    def wrapper(*args):
+        nonlocal t_start
+        if time() - t_start > 7:
+            send_action()
+            t_start = time()
+        return store_func(*args)
+    anim._func = wrapper
+
+    anim.save(filepath, extra_anim=anim_list[1:], *args, **kwargs)
+    anim._func = store_func
+
 def send_notifications(notifications, delay=DEFAULT_DELAY, check_idle=True, idle=False):
+    """send a collection of notifications
+
+    Arguments:
+        notifications      list of functions to call that send notifications (no arguments)
+        delay              time (in seconds) to check if the user is idle before notifying
+        check_idle         whether or not to check if the user is idle (default: True)
+        idle               whether or not the user is idle now (default: False)
+
+    """
     if not notifications_active():
         return
 
