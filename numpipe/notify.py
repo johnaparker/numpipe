@@ -43,6 +43,10 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
         delay         time (in seconds) to check before declaring idle
         check_every   time (in seconds) between interaction checks
     """
+    nfigures_before = len(plt.get_fignums())
+    if not nfigures_before:
+        raise RuntimeError('cannot check for user idleness if there are no figures')
+
     mouse_moved = False
     key_pressed = False
     def on_mouse_movement(event):
@@ -53,7 +57,6 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
         nonlocal key_pressed
         key_pressed = True
 
-    nfigures_before = len(plt.get_fignums())
     fig = plt.figure(nfigures_before)
     cid = fig.canvas.mpl_connect('motion_notify_event', on_mouse_movement)
     cid = fig.canvas.mpl_connect('key_press_event', on_key_press)
@@ -182,7 +185,7 @@ def send_notifications(notifications, delay=DEFAULT_DELAY, check_idle=True, idle
 
     if check_idle:
         idle = check_idle_matplotlib(delay=delay)
-    
+
     if idle:
         for notification in notifications:
             notification()

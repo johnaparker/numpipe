@@ -304,6 +304,7 @@ class scheduler:
             plt.show = lambda: None
             mpl_tools.set_theme(self.args.theme)
 
+            send_figures = True
             try:
                 ret = func()
                 if isinstance(ret, types.GeneratorType):
@@ -313,8 +314,15 @@ class scheduler:
                     self.add_animation(ret)
             except Exception as err:
                 traceback.print_exception(type(err), err, err.__traceback__)
+                if not plt.get_fignums():
+                    plt.figure()
+                    send_figures = False
+                    message = '`@plots` threw an error before any figures were created'
+                else:
+                    message = '`@plots` threw an error, some images may not be sent'
+
                 self.notifications.append(partial(notify.send_message,
-                                message='`@plots` threw an error, some images may not be sent'))
+                                message=message))
 
             animated_figs = self.animations.keys()
 
@@ -330,7 +338,7 @@ class scheduler:
                     filepath = mpl_tools.get_filepath(filename, arg)
                     mpl_tools.save_animation(anim, filepath)
 
-            if self.num_blocks_executed > 0:
+            if self.num_blocks_executed > 0 and send_figures:
                 self.notifications.append(partial(notify.send_images,
                                             filename=self.filename, exempt=animated_figs))
                 self.notifications.append(partial(notify.send_videos,
