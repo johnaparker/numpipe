@@ -27,7 +27,9 @@ def run_parser():
 
         p.add_argument('--theme', default='normal', type=str, help='matplotlib plot theme')
         p.add_argument('--figures', nargs='+', type=int, help='which figure numbers to display')
-        p.add_argument('--save', nargs='?', default='', type=str, help='save all figures')
+        p.add_argument('--save', nargs='?', default='', type=str, help='save figures and animations')
+        p.add_argument('--save-figs', nargs='?', default='', type=str, help='save figures')
+        p.add_argument('--save-anims', nargs='?', default='', type=str, help='save animations')
         # p.add_argument('--theme', choices=['classic', 'dark'], default='classic', help='matplotlib plot theme')
 
 

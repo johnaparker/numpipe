@@ -4,7 +4,6 @@ from datetime import datetime
 from time import time, sleep
 from numpipe import config
 import matplotlib.pyplot as plt
-from my_pytools.my_matplotlib.animation import save_animation
 
 DEFAULT_DELAY = config.get_config()['notifications']['default_delay']
 
@@ -166,7 +165,6 @@ def send_videos(anims):
             filepath = f'{direc}/vid{i}.mp4'
             bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.UPLOAD_VIDEO)
             anim_list[0].save(filepath, extra_anim=anim_list[1:])
-            # save_animation(anim_list, filepath)
             bot.send_animation(chat_id, animation=open(filepath, 'rb'))
 
 def send_notifications(notifications, delay=DEFAULT_DELAY, check_idle=True, idle=False):

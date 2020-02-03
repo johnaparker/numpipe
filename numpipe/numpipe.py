@@ -309,17 +309,26 @@ class scheduler:
                     self.add_animation(anim)
             elif ret is not None:
                 self.add_animation(ret)
+            animated_figs = self.animations.keys()
+
+            if self.args.save_figs != '' or self.args.save != '':
+                arg = self.args.save_figs if self.args.save_figs != '' else self.args.save
+                mpl_tools.save_figures(self.filename, arg,
+                                       self.args.figures, exempt=animated_figs)
+
+            if self.args.save_anims != '' or self.args.save != '':
+                arg = self.args.save_anims if self.args.save_anims != '' else self.args.save
+                for fignum, anim in self.animations.items():
+                    filename = f'{self.filename}_vid{fignum}.mp4'
+                    filepath = mpl_tools.get_filepath(filename, arg)
+                    mpl_tools.save_animation(anim, filepath)
 
             if self.num_blocks_executed > 0:
-                animated_figs = self.animations.keys()
                 self.notifications.append(partial(notify.send_images,
                                             filename=self.filename, exempt=animated_figs))
                 self.notifications.append(partial(notify.send_videos,
                                             anims=self.animations.values()))
-
             self.send_notifications()
-            if self.args.save != '':
-                mpl_tools.save_figures(self.filename, self.args.save, self.args.figures)
 
             plt.show = show_copy
             if self.args.figures is not None:
