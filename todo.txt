@@ -1,22 +1,27 @@
-dependency:
+CRITICAL ISSUES
+    * if B depends on A and B is selectively re-ran, it never runs
+    * if @cache function throws an exception after yields have occured, no results are saved (results should be dumped after an exception)
+
+FEATURE: DEPENDENCY
     * allow dependency for instanaces
     * If B depends on A, and A throws an error.... do something
     * if A is rerun, then rerun B if B depends on A, unless --no-dependency flag is specified 
     * more sophisticated tree dependency checking
     * implicit dependencies using job.load
 
-notifications
-    * if a traceback occurs before any plots get made in @plots, open an empty figure that won't get notified to check for idle
+FEATURE: NOTIFICATIONS
     * notifications of simulation finishing when there is no @plots
     * RCC: can we add a single python --at-end call that runs after all others have finished? (runs with --no-show and --no-delay)
     * deal with multiple @plots
 
-* save animations in parallel (each process needs to call the undecorated @plots function to generate its respective animation)
+NEW FEATURES
+    * --debug mode that will: serial execute functions (no pool processes), restore normal tqdm behavior, and print exceptions rather than log them
+    * job.add_instance(sim, label) --> if label already exists, make the labels label_0, label_1, etc.
+    * save animations in parallel (each process needs to call the undecorated @plots function to generate its respective animation)
+    * command-line save figure options: file format (svg, pdf, etc.), dpi, bbox_inches, etc.
+    * parallel execution with a single h5 file (not add_instance, perhaps add_piece to fill part of the h5file)
+    * defer load option to read only part of the h5file
 
-* command-line save figure options: file format (svg, pdf, etc.), dpi, bbox_inches, etc.
-
-* parallel execution with a single h5 file (not add_instance)
-
-* h5cache: max_memory across all npcaches, npcaches need to concatenate some minimum size
-
-* defer load option to read only part of the h5file
+CODE IMPROVEMENTS
+    * scheduler.execute function should be broken into smaller functions
+    * h5cache: max_memory across all npcaches, npcaches need to concatenate some minimum size
