@@ -136,9 +136,3 @@ def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position):
 
     except:
         raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
-
-    pbar.unit = '\b'*4
-    N = 11
-    post = '[______100%______'
-    pbar.set_postfix(dict(x='\b'*N + post))
-    pbar.set_description(colored(name, color='green'))

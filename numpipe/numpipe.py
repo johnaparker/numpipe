@@ -23,7 +23,9 @@ from functools import partial
 from typing import Iterable, types
 import matplotlib.pyplot as plt
 import traceback
+from termcolor import colored
 
+import numpipe
 from numpipe import slurm, display, notify, mpl_tools
 from numpipe.execution import deferred_function, target, block, execute_block
 from numpipe.utility import doublewrap
@@ -39,7 +41,8 @@ class scheduler:
         self.blocks = dict()
         self.instances = dict()
         self.at_end_functions = dict()
-        self.animations =dict() 
+        self.animations = dict() 
+        self.progress_bars = dict()
 
         if dirpath is None:
             self.dirpath = sys.path[0]
@@ -123,8 +126,7 @@ class scheduler:
             self.delete()
             return
 
-        import numpipe as nf
-        nf._tqdm_mininterval = self.args.tqdm
+        numpipe._tqdm_mininterval = self.args.tqdm
         
         self.num_blocks_executed = 0
         if not self.args.at_end:
@@ -176,6 +178,7 @@ class scheduler:
                             if self.ready_to_run(block):
                                 results[name] = pool.apply_async(execute_block, 
                                         (block, name, self.mpi_rank, self.instances, self.args.cache_time, num_blocks_ran))
+                                self.progress_bars[name] = num_blocks_ran
                                 to_delete.append(name)
                                 num_blocks_ran += 1
 
@@ -187,9 +190,11 @@ class scheduler:
                             if result.ready():
                                 try:
                                     result.get()
+                                    self.finish_progress_bar(name, success=True)
                                 except Exception as err:
+                                    self.finish_progress_bar(name, success=False)
                                     num_exceptions += 1
-                                    print(err)
+                                    # print(err)
 
                                 self.blocks[name].complete = True
                                 to_delete.append(name)
@@ -229,6 +234,24 @@ class scheduler:
 
                 for func in self.at_end_functions.values():
                     func()
+
+    def finish_progress_bar(self, name, success):
+        pos = self.progress_bars[name]
+        pbar = numpipe.tqdm(position=pos+1)
+
+        pbar.unit = '\b'*4
+        N = 11
+
+        if success:
+            color = 'green'
+            post = '[______{}______'.format(colored('PASS', color=color))
+        else:
+            color = 'red'
+            post = '[______{}______'.format(colored('FAIL', color=color))
+        pbar.set_postfix(dict(x='\b'*N + post))
+        pbar.set_description(colored(name, color=color))
+
+        self.progress_bars.pop(name)
 
     def ready_to_run(self, block):
         if block.dependencies is None:
