@@ -13,11 +13,12 @@ import types
 from functools import partial
 import numpipe
 import tqdm
+from termcolor import colored
 
 from numpipe.fileio import load_symbols, write_symbols
-from numpipe import display
 from numpipe.h5cache import h5cache
 from numpipe.utility import once
+from numpipe import display, config
 
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
@@ -91,13 +92,15 @@ class block:
 
 # @yield_traceback
 def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position):
-    numpipe.tqdm = partial(numpipe.tqdm, position=tqdm_position, desc=name)
-    tqdm.tqdm= partial(numpipe.tqdm, position=tqdm_position, desc=name)
+    ascii_value = config.get_config()['tqdm']['ascii']
+    desc = name
+    numpipe.tqdm = partial(numpipe.tqdm, position=tqdm_position+1, desc=desc, ascii=ascii_value)
+    tqdm.tqdm = partial(numpipe.tqdm, position=tqdm_position+1, desc=desc)
+    pbar = numpipe.tqdm()
 
     try:
         func = block.deferred_function
         if mpi_rank == 0:
-            display.cached_function_message(name)
             if func.__name__ in instances and name in instances[func.__name__]:
                 ### write arguments if instance funcitont 
                 block.target.write_args(func.kwargs)
@@ -134,3 +137,8 @@ def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position):
     except:
         raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
+    pbar.unit = '\b'*4
+    N = 11
+    post = '[______100%______'
+    pbar.set_postfix(dict(x='\b'*N + post))
+    pbar.set_description(colored(name, color='green'))

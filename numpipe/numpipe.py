@@ -163,57 +163,64 @@ class scheduler:
             ### execute all items
             t_start = time()
             num_exceptions = 0
-            with Pool(processes=self.args.processes) as pool:
-                results = dict()
-                remaining = list(blocks_to_execute.keys())
-                while remaining or results:
-                    to_delete = []
-                    for name in remaining:
-                        block = blocks_to_execute[name]
-                        if self.ready_to_run(block):
-                            results[name] = pool.apply_async(execute_block, 
-                                    (block, name, self.mpi_rank, self.instances, self.args.cache_time, len(results)))
-                            to_delete.append(name)
+            if self.num_blocks_executed:
+                display.cached_function_message()
+                with Pool(processes=self.args.processes) as pool:
+                    results = dict()
+                    remaining = list(blocks_to_execute.keys())
+                    num_blocks_ran = 0
+                    while remaining or results:
+                        to_delete = []
+                        for name in remaining:
+                            block = blocks_to_execute[name]
+                            if self.ready_to_run(block):
+                                results[name] = pool.apply_async(execute_block, 
+                                        (block, name, self.mpi_rank, self.instances, self.args.cache_time, num_blocks_ran))
+                                to_delete.append(name)
+                                num_blocks_ran += 1
 
-                    for name in to_delete:
-                        remaining.remove(name)
+                        for name in to_delete:
+                            remaining.remove(name)
 
-                    to_delete = []
-                    for name, result in results.items():
-                        if result.ready():
-                            try:
-                                result.get()
-                            except Exception as err:
-                                num_exceptions += 1
-                                traceback.print_exception(type(err), err, err.__traceback__)
+                        to_delete = []
+                        for name, result in results.items():
+                            if result.ready():
+                                try:
+                                    result.get()
+                                except Exception as err:
+                                    num_exceptions += 1
+                                    print(err)
 
-                            self.blocks[name].complete = True
-                            to_delete.append(name)
+                                self.blocks[name].complete = True
+                                to_delete.append(name)
 
-                    for name in to_delete:
-                        results.pop(name)
+                        for name in to_delete:
+                            results.pop(name)
 
-                    sleep(.1)
+                        sleep(.1)
 
-                if USE_SERVER:
-                    t = threading.Thread(target=self.listening_thread) 
-                    t.start()
+                    if USE_SERVER:
+                        t = threading.Thread(target=self.listening_thread) 
+                        t.start()
 
-                pool.close()
-                pool.join()
-                
-                self.complete = True
+                    pool.close()
+                    pool.join()
 
-                if blocks_to_execute and self.mpi_rank == 0:
-                    self.notifications.append(partial(notify.send_finish_message,
-                                                filename=self.filename, 
-                                                njobs=len(blocks_to_execute),
-                                                time=time() - t_start,
-                                                num_exceptions=num_exceptions))
-                
-                if USE_SERVER:
-                    t.join()
-                    self.pipe.close()
+                    for i in range(1+self.num_blocks_executed):
+                        print()
+                    
+                    self.complete = True
+
+                    if blocks_to_execute and self.mpi_rank == 0:
+                        self.notifications.append(partial(notify.send_finish_message,
+                                                    filename=self.filename, 
+                                                    njobs=len(blocks_to_execute),
+                                                    time=time() - t_start,
+                                                    num_exceptions=num_exceptions))
+                    
+                    if USE_SERVER:
+                        t.join()
+                        self.pipe.close()
 
         ### At-end functions
         if self.mpi_rank == 0:

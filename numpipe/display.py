@@ -88,11 +88,11 @@ def at_end_message():
 
     print(colored('Running at-end functions', color='yellow'))
 
-def cached_function_message(name):
-    """Display message when running cached function
+def cached_function_message():
+    """Display message when running cached functions
     
     Arguments:
         name    name of the cached function
     """
 
-    print(colored(f"Running cached function '{name}'", color='yellow'))
+    print(colored("Running cached functions", color='yellow'), end='')

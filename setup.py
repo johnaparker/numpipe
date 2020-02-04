@@ -36,6 +36,9 @@ def post_install():
     [notifications.telegram]
     token = ""
     chat_id = 0
+
+[tqdm]
+    ascii = false
 """.strip()
 
     config_path = pathlib.Path('~/.config/numpipe/numpipe.conf').expanduser()
