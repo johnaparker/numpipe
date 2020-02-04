@@ -91,9 +91,9 @@ class block:
         self.complete = False
 
 # @yield_traceback
-def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position):
+def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, total):
     ascii_value = config.get_config()['tqdm']['ascii']
-    desc = name
+    desc = f'({1+tqdm_position}/{total}) {name}'
     numpipe.tqdm = partial(numpipe.tqdm, position=tqdm_position+1, desc=desc, ascii=ascii_value)
     tqdm.tqdm = partial(numpipe.tqdm, position=tqdm_position+1, desc=desc)
     pbar = numpipe.tqdm()

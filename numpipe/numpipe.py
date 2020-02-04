@@ -177,7 +177,7 @@ class scheduler:
                             block = blocks_to_execute[name]
                             if self.ready_to_run(block):
                                 results[name] = pool.apply_async(execute_block, 
-                                        (block, name, self.mpi_rank, self.instances, self.args.cache_time, num_blocks_ran))
+                                        (block, name, self.mpi_rank, self.instances, self.args.cache_time, num_blocks_ran, self.num_blocks_executed))
                                 self.progress_bars[name] = num_blocks_ran
                                 to_delete.append(name)
                                 num_blocks_ran += 1
@@ -249,7 +249,8 @@ class scheduler:
             color = 'red'
             post = '[______{}______'.format(colored('FAIL', color=color))
         pbar.set_postfix(dict(x='\b'*N + post))
-        pbar.set_description(colored(name, color=color))
+        desc = f'({1+pos}/{self.num_blocks_executed}) {name}'
+        pbar.set_description(colored(desc, color=color))
 
         self.progress_bars.pop(name)
 
