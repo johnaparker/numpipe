@@ -10,6 +10,7 @@ import h5py
 import os
 import sys
 import pathlib
+import logging
 from inspect import signature
 from multiprocessing import Pool, Value
 import threading
@@ -56,6 +57,11 @@ class scheduler:
             pathlib.Path(self.dirpath).mkdir(parents=False, exist_ok=True) 
 
         self.filename = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+
+        self.logfile = pathlib.Path(self.dirpath) / f'{self.filename}.log'
+        logging.basicConfig(filename=self.logfile, filemode='w', level=logging.DEBUG,
+                            format='%(levelname)s: %(message)s')
+        logging.captureWarnings(True)
 
         address = ('localhost', 6000)
         if USE_SERVER:
@@ -194,7 +200,7 @@ class scheduler:
                                 except Exception as err:
                                     self.finish_progress_bar(name, success=False)
                                     num_exceptions += 1
-                                    # print(err)
+                                    logging.error(err)
 
                                 self.blocks[name].complete = True
                                 to_delete.append(name)
