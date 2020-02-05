@@ -169,14 +169,20 @@ class scheduler:
                 return
 
             ### execute all items
+            if self.args.processes is None:
+                nprocs = min(os.cpu_count(), self.num_blocks_executed)
+            else:
+                nprocs = min(self.args.processes, self.num_blocks_executed)
+
             t_start = time()
-            num_exceptions = 0
             if self.num_blocks_executed:
                 display.cached_function_message()
-                with Pool(processes=self.args.processes) as pool:
+
+                with Pool(processes=nprocs) as pool:
                     results = dict()
                     remaining = list(blocks_to_execute.keys())
                     num_blocks_ran = 0
+                    num_exceptions = 0
                     while remaining or results:
                         to_delete = []
                         for name in remaining:

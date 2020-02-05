@@ -1,4 +1,3 @@
-import telegram
 import socket
 from datetime import datetime
 from time import time, sleep
@@ -101,8 +100,9 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
 
 def send_message(message):
     """send a text message"""
-    bot = telegram.Bot(token=get_bot_token())
-    bot.send_message(chat_id=get_chat_id(), text=message, parse_mode=telegram.ParseMode.MARKDOWN)
+    from telegram import Bot, ParseMode
+    bot = Bot(token=get_bot_token())
+    bot.send_message(chat_id=get_chat_id(), text=message, parse_mode=ParseMode.MARKDOWN)
 
 def send_finish_message(filename, njobs, time, num_exceptions):
     """send a text message summarizing the jobs that ran
@@ -144,11 +144,12 @@ def send_images(filename, exempt=[]):
     if not plt.get_fignums():
         return
 
+    from telegram import Bot, ChatAction, InputMediaPhoto
     from io import BytesIO
-    bot = telegram.Bot(token=get_bot_token())
+    bot = Bot(token=get_bot_token())
     chat_id = get_chat_id()
 
-    send_action = lambda: bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.UPLOAD_PHOTO)
+    send_action = lambda: bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
     send_action()
     media = []
 
@@ -165,7 +166,7 @@ def send_images(filename, exempt=[]):
         bio.name = f'fig{i}.png'
         fig.savefig(bio, format='png')
         bio.seek(0)
-        media.append(telegram.InputMediaPhoto(bio, caption=caption))
+        media.append(InputMediaPhoto(bio, caption=caption))
         plt.close(fig)
 
         num_figs += 1
@@ -190,10 +191,11 @@ def send_videos(anims):
     if not anims:
         return
 
+    from telegram import Bot
     import tempfile 
     plt.close('all')
 
-    bot = telegram.Bot(token=get_bot_token())
+    bot = Bot(token=get_bot_token())
     chat_id = get_chat_id()
 
     with tempfile.TemporaryDirectory() as direc:
@@ -214,8 +216,9 @@ def send_animation(bot, chat_id, anim_list, filepath, *args, **kwargs):
         *args       additional arguments to pass to anim.save
         **kwargs    additional key-word arguments to pass to anim.save
     """
+    from telegram import ChatAction
     anim  = anim_list[0]
-    send_action = lambda: bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.UPLOAD_VIDEO)
+    send_action = lambda: bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_VIDEO)
 
     store_func = anim._func
     t_start = time()
