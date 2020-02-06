@@ -263,6 +263,7 @@ class scheduler:
         pbar.set_postfix(dict(x='\b'*N + post))
         desc = f'({1+pos}/{self.num_blocks_executed}) {name}'
         pbar.set_description(colored(desc, color=color))
+        pbar.close()
 
         self.progress_bars.pop(name)
 

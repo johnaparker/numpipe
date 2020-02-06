@@ -97,6 +97,7 @@ def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, t
     numpipe.tqdm = partial(numpipe.tqdm, position=tqdm_position+1, desc=desc, ascii=ascii_value)
     tqdm.tqdm = partial(numpipe.tqdm, position=tqdm_position+1, desc=desc)
     pbar = numpipe.tqdm()
+    pbar.close()
 
     try:
         func = block.deferred_function
