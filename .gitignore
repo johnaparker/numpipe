@@ -6,3 +6,5 @@ __pycache__
 # misc
 *.sw*
 *.h5
+*.log
+*.png

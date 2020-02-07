@@ -147,6 +147,8 @@ class scheduler:
                     labels = self.get_labels(name)
                     blocks_to_execute.update({label: self.blocks[label] for label in labels})
 
+            self.resolve_dependencies(blocks_to_execute)
+
             self.num_blocks_executed = len(blocks_to_execute)
             aborting = False
             if self.mpi_rank == 0:
@@ -271,8 +273,8 @@ class scheduler:
         if block.dependencies is None:
             return True
         
-        for func in block.dependencies:
-            if not self.blocks[func.__name__].complete:
+        for D in block.dependencies:
+            if not self.blocks[D].complete:
                 return False
         
         return True
@@ -488,6 +490,21 @@ class scheduler:
 
         raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
 
+    def resolve_dependencies(self, blocks):
+        if len(self.args.rerun) != 0:
+            block_dependencies = blocks
+            while block_dependencies:
+                new_blocks = dict()
+                for label, block in block_dependencies.items():
+                    for dependency in block.dependencies:
+                        if not self.blocks[dependency].target.exists():
+                            new_blocks[dependency] = self.blocks[dependency]
+                        else:
+                            self.blocks[dependency].complete = True
+
+                blocks.update(new_blocks)
+                block_dependencies = new_blocks
+
     def delete(self):
         """
         delete target data
@@ -495,7 +512,7 @@ class scheduler:
         targets_to_delete = []
 
         if len(self.args.delete) == 0:
-            targets_to_delete.extend([block.target for block in self.blocks])
+            targets_to_delete.extend([block.target for block in self.blocks.values()])
         else:
             for name in self.args.delete:
                 labels = self.get_labels(name)

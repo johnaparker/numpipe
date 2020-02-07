@@ -82,11 +82,11 @@ class block:
 
         if dependencies is not None:
             if isinstance(dependencies, Iterable):
-                self.dependencies = dependencies
+                self.dependencies = [D.__name__ for D in dependencies]
             else:
-                self.dependencies = [dependencies]
+                self.dependencies = [dependencies.__name__]
         else:
-            self.dependencies = None
+            self.dependencies = []
 
         self.complete = False
 

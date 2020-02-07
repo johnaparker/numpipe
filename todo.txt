@@ -1,5 +1,4 @@
 CRITICAL ISSUES
-    * if B depends on A and B is selectively re-ran, it never runs
     * if @cache function throws an exception after yields have occured, no results are saved (results should be dumped after an exception)
 
 FEATURE: DEPENDENCY

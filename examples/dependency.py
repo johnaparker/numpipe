@@ -5,19 +5,16 @@ job = scheduler()
 
 @job.cache()
 def A():
-    print('running A')
     sleep(1)
     return dict(x=2)
 
 @job.cache(depends=A)
 def B():
-    print('running B')
     sleep(1)
     return dict(x=2)
 
-@job.cache(depends=A)
+@job.cache(depends=B)
 def C():
-    print('running C')
     sleep(1)
     return dict(x=2)
 
