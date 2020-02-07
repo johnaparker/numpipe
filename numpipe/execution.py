@@ -88,6 +88,7 @@ class block:
         else:
             self.dependencies = []
 
+        self.children = []
         self.complete = False
 
 # @yield_traceback
