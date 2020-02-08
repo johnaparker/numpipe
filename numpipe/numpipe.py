@@ -25,6 +25,7 @@ from typing import Iterable, types
 import matplotlib.pyplot as plt
 import traceback
 from termcolor import colored
+from copy import copy
 
 import numpipe
 from numpipe import slurm, display, notify, mpl_tools, config
@@ -42,6 +43,7 @@ class scheduler:
     def __init__(self, dirpath=None):
         self.blocks = dict()
         self.instances = dict()
+        self.instance_dependency = dict()
         self.at_end_functions = dict()
         self.animations = dict() 
         self.progress_bars = dict()
@@ -307,10 +309,13 @@ class scheduler:
 
         block_name = f'{func.__name__}-{instance_name}'
         filepath = f'{self.dirpath}/{self.filename}-{block_name}.h5'
+
+        depends = self.instance_dependency.get(func.__name__)
         
         self.blocks[block_name] = block(
                           deferred_function(func, kwargs=kwargs, num_iterations=None),
-                          target(filepath))
+                          target(filepath),
+                          dependencies=depends)
         self.instances[func.__name__].append(block_name)
 
     def add_instances(self, func, instances):
@@ -336,6 +341,8 @@ class scheduler:
                         dependencies=depends)
         else:
             self.instances[func.__name__] = []
+            if depends is not None:
+                self.instance_dependency[func.__name__] = depends
 
         return func
 
@@ -492,12 +499,19 @@ class scheduler:
         raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
 
     def resolve_dependencies(self, blocks):
-        if self.args.rerun is not None and len(self.args.rerun) != 0:
-            for label, block in self.blocks.items():
-                for D in block.dependencies:
-                    if label not in self.blocks[D].children:
-                        self.blocks[D].children.append(label)
+        for label, block in self.blocks.items():
+            for D in copy(block.dependencies):
+                all_deps = self.instances.get(D)
+                if all_deps is not None:
+                    block.dependencies.remove(D)
+                    block.dependencies.extend(all_deps)
 
+        for label, block in self.blocks.items():
+            for D in block.dependencies:
+                if label not in self.blocks[D].children:
+                    self.blocks[D].children.append(label)
+
+        if self.args.rerun is not None and len(self.args.rerun) != 0:
             # DOWN the tree
             block_dependencies = blocks
             if not self.args.no_deps:
