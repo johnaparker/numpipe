@@ -16,6 +16,7 @@ FEATURE: NOTIFICATIONS
 NEW FEATURES
     * --debug mode that will: serial execute functions (no pool processes), restore normal tqdm behavior, and print exceptions rather than log them
     * job.add_instance(sim, label) --> if label already exists, make the labels label_0, label_1, etc.
+    * log summary for each block: run-time, exceptions, etc
     * save animations in parallel (each process needs to call the undecorated @plots function to generate its respective animation)
     * command-line save figure options: file format (svg, pdf, etc.), dpi, bbox_inches, etc.
     * parallel execution with a single h5 file (not add_instance, perhaps add_piece to fill part of the h5file)

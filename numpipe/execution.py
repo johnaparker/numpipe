@@ -83,10 +83,11 @@ class block:
         self.target = target
 
         if dependencies is not None:
+            f = lambda D: D if isinstance(D, str) else D.__name__
             if isinstance(dependencies, Iterable):
-                self.dependencies = [D.__name__ for D in dependencies]
+                self.dependencies = [f(D) for D in dependencies]
             else:
-                self.dependencies = [dependencies.__name__]
+                self.dependencies = [f(dependencies)]
         else:
             self.dependencies = []
 
