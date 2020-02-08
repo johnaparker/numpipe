@@ -19,6 +19,6 @@ def vis():
         print(var.x)
 
 for i in range(5):
-    job.add_instance(sim, f'S{i}', param=i)
+    job.add(sim, f'S{i}', param=i)
 
 job.execute()

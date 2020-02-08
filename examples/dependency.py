@@ -23,7 +23,7 @@ def D():
     sleep(1)
     return dict(x=2)
 
-job.add_instance(C, i=0)
-job.add_instance(C, i=1).depends(B)
+job.add(C, i=0)
+job.add(C, i=1).depends(B)
 
 job.execute()

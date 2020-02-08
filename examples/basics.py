@@ -40,9 +40,9 @@ def sim4(param):
 def sim5():
     pass
 
-job.add_instance(sim4, param=2)
-job.add_instance(sim4, param=3)
-job.add_instance(sim4, param=4)
+job.add(sim4, param=2)
+job.add(sim4, param=3)
+job.add(sim4, param=4)
 
 @job.at_end
 def vis():

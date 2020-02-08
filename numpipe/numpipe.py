@@ -321,7 +321,7 @@ class scheduler:
                 print('progress sent')
 
     # @static_vars(counter=0)
-    def add_instance(self, _func, _instance_name=None, **kwargs):
+    def add(self, _func, _instance_name=None, **kwargs):
         """
         Add an instance (a function with specified kwargs)
         """
@@ -347,7 +347,7 @@ class scheduler:
             instances   dictionary of name: dict(kwargs)
         """
         for instance_name, kwargs in instances.items():
-            self.add_instance(func, instance_name, **kwargs)
+            self.add(func, instance_name, **kwargs)
 
     @doublewrap
     def cache(self, func, depends=None):
