@@ -62,7 +62,7 @@ class scheduler:
         self.filename = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 
         self.logfile = pathlib.Path(self.dirpath) / f'{self.filename}.log'
-        logging.basicConfig(filename=self.logfile, filemode='w', level=logging.DEBUG,
+        logging.basicConfig(filename=self.logfile, filemode='w', level=logging.INFO,
                             format='%(levelname)s: %(message)s')
         logging.captureWarnings(True)
 
