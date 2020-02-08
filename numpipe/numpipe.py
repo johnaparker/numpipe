@@ -491,7 +491,7 @@ class scheduler:
         raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
 
     def resolve_dependencies(self, blocks):
-        if len(self.args.rerun) != 0:
+        if self.args.rerun is not None and len(self.args.rerun) != 0:
             # DOWN the tree
             for label, block in self.blocks.items():
                 for D in block.dependencies:
