@@ -493,22 +493,22 @@ class scheduler:
 
     def resolve_dependencies(self, blocks):
         if self.args.rerun is not None and len(self.args.rerun) != 0:
-            # DOWN the tree
             for label, block in self.blocks.items():
                 for D in block.dependencies:
                     if label not in self.blocks[D].children:
                         self.blocks[D].children.append(label)
 
-            # UP the tree
+            # DOWN the tree
             block_dependencies = blocks
-            while block_dependencies:
-                new_blocks = dict()
-                for label, block in block_dependencies.items():
-                    for child in block.children:
-                        new_blocks[child] = self.blocks[child]
+            if not self.args.no_deps:
+                while block_dependencies:
+                    new_blocks = dict()
+                    for label, block in block_dependencies.items():
+                        for child in block.children:
+                            new_blocks[child] = self.blocks[child]
 
-                blocks.update(new_blocks)
-                block_dependencies = new_blocks
+                    blocks.update(new_blocks)
+                    block_dependencies = new_blocks
 
 
             # UP the tree
