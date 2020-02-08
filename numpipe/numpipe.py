@@ -244,6 +244,8 @@ class scheduler:
                         t.join()
                         self.pipe.close()
 
+                    display.cached_function_summary(self.num_blocks_executed, num_exceptions)
+
         ### At-end functions
         if self.mpi_rank == 0:
             if self.at_end_functions and not self.args.no_at_end:

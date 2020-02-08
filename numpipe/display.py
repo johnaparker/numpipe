@@ -96,3 +96,13 @@ def cached_function_message():
     """
 
     print(colored("Running cached functions", color='yellow'), end='')
+
+def cached_function_summary(num_executed, num_exceptions):
+    """display message when all cached functions have ran"""
+    print()
+    print(colored("Execution summary", color='yellow'))
+    l1 = 'runs' if num_executed != 1 else 'run'
+    l2 = 'failures' if num_exceptions != 1 else 'failure'
+    message = f'    {num_executed} {l1}, {num_exceptions} {l2}'
+    print(message)
+    print()
