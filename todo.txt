@@ -1,5 +1,4 @@
 CRITICAL ISSUES
-    * if @cache function throws an exception after yields have occured, no results are saved (results should be dumped after an exception)
 
 FEATURE: DEPENDENCY
     * check for circular dependencies

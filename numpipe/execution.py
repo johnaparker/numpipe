@@ -107,6 +107,7 @@ def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, t
     pbar = numpipe.tqdm()
     pbar.close()
 
+    cache = None
     try:
         func = block.deferred_function
         if mpi_rank == 0:
@@ -144,6 +145,8 @@ def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, t
                 raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
 
     except:
+        if cache is not None:
+            cache.flush()
         raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
 def execute_block_debug(block, name, mpi_rank, instances, cache_time, tqdm_position, total):
