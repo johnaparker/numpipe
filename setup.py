@@ -30,8 +30,11 @@ def read(fname):
 
 def post_install():
     config_str = """
+[execution]
+    parallel_default = true
+
 [notifications]
-    default_delay = 120
+    delay_default = 120
 
     [notifications.telegram]
     token = ""
@@ -39,6 +42,7 @@ def post_install():
 
 [tqdm]
     ascii = false
+    max_rows = 100
 """.strip()
 
     config_path = pathlib.Path('~/.config/numpipe/numpipe.conf').expanduser()

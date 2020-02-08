@@ -4,7 +4,7 @@ from time import time, sleep
 from numpipe import config
 import matplotlib.pyplot as plt
 
-DEFAULT_DELAY = config.get_config()['notifications']['default_delay']
+DEFAULT_DELAY = config.get_config()['notifications']['delay_default']
 
 def get_bot_token():
     """get bot token from config file"""

@@ -4,7 +4,8 @@ Defines the argument parser
 import argparse
 from numpipe import config
 
-notifications_default_delay = config.get_config()['notifications']['default_delay']
+notifications_default_delay = config.get_config()['notifications']['delay_default']
+processes_default = None if config.get_config()['execution']['parallel_default'] else 1
 
 def run_parser():
     parser = argparse.ArgumentParser()
@@ -20,7 +21,7 @@ def run_parser():
         p.add_argument('-d', '--delete', nargs='*', type=str, default=None, help='delete specified cached data')
         p.add_argument('--at-end', action='store_true', default=False, help="only run at_end functions")
         p.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
-        p.add_argument('-p', '--processes', nargs='?', default=1, type=int, help='number of processes to use in parallel execution (default: cpu_count)')
+        p.add_argument('-p', '--processes', nargs='?', default=processes_default, type=int, help='number of processes to use in parallel execution (default: cpu_count)')
         p.add_argument('-ct', '--cache_time', type=float, default=300, help='time (in seconds) until data cached data is flushed to file')
         p.add_argument('--tqdm', type=float, default=.1, help='time (in seconds) for tqdm mininterval argument')
         p.add_argument('--notify-delay', type=float, default=notifications_default_delay, help='time (in seconds) before notifications will be sent')
