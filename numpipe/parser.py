@@ -34,6 +34,7 @@ def run_parser():
         p.add_argument('--save-anims', nargs='?', default='', type=str, help='save animations')
         # p.add_argument('--theme', choices=['classic', 'dark'], default='classic', help='matplotlib plot theme')
 
+    parser.add_argument('--debug', action='store_true', default=False, help='run in debug mode (single process)')
 
     slurm_parse.add_argument('-t', '--time', type=str, default='36', help='maximum run-time for the Slurm job, formated as {hours}:{minutes}:{seconds} (minutes and seconds optional)')
     slurm_parse.add_argument('-m', '--memory', type=float, default=2, help='maximum memory per cpu for the Slurm job in GB')

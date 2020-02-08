@@ -145,3 +145,45 @@ def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, t
 
     except:
         raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
+
+def execute_block_debug(block, name, mpi_rank, instances, cache_time, tqdm_position, total):
+    ascii_value = config.get_config()['tqdm']['ascii']
+    desc = f'({1+tqdm_position}/{total}) {name}'
+    numpipe.tqdm = partial(numpipe.tqdm, desc=desc, ascii=ascii_value)
+    tqdm.tqdm = partial(numpipe.tqdm, desc=desc)
+
+    func = block.deferred_function
+    if mpi_rank == 0:
+        if func.__name__ in instances and name in instances[func.__name__]:
+            ### write arguments if instance funcitont 
+            block.target.write_args(func.kwargs)
+
+    MPI.COMM_WORLD.Barrier()
+    symbols = func()
+
+    ### Generator functions
+    if isinstance(symbols, types.GeneratorType):
+        cache = h5cache(block.target.filepath, cache_time=cache_time)
+
+        ### iterate over all symbols, caching each one
+        for next_symbols in symbols:
+            if mpi_rank == 0:
+                if type(next_symbols) is once:
+                    block.target.write(next_symbols)
+                else:
+                    for symbol_name, next_symbol in next_symbols.items():
+                        cache.add(symbol_name, next_symbol)
+
+        ### empty any of the remaining cache
+        if mpi_rank == 0:
+            cache.flush()
+
+    ### Standard Functions
+    else:
+        if isinstance(symbols, dict):
+            block.target.write(symbols)
+        elif symbols is None:
+            block.target.write(dict())
+        else:
+            raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
+

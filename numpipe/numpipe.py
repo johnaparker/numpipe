@@ -29,7 +29,7 @@ from copy import copy
 
 import numpipe
 from numpipe import slurm, display, notify, mpl_tools, config
-from numpipe.execution import deferred_function, target, block, execute_block
+from numpipe.execution import deferred_function, target, block, execute_block, execute_block_debug
 from numpipe.utility import doublewrap
 from numpipe.parser import run_parser
 from numpipe.networking import recv_msg,send_msg
@@ -183,68 +183,87 @@ class scheduler:
             if self.num_blocks_executed:
                 display.cached_function_message()
 
-                with Pool(processes=nprocs) as pool:
-                    results = dict()
+                if self.args.debug:
                     remaining = list(blocks_to_execute.keys())
                     num_blocks_ran = 0
-                    num_exceptions = 0
-                    while remaining or results:
+
+                    while remaining:
                         to_delete = []
                         for name in remaining:
                             block = blocks_to_execute[name]
                             if self.ready_to_run(block):
-                                results[name] = pool.apply_async(execute_block, 
-                                        (block, name, self.mpi_rank, self.instances, self.args.cache_time, num_blocks_ran, self.num_blocks_executed))
-                                self.progress_bars[name] = num_blocks_ran
+                                execute_block_debug(block, name, self.mpi_rank, self.instances,
+                                         self.args.cache_time, num_blocks_ran, self.num_blocks_executed)
                                 to_delete.append(name)
                                 num_blocks_ran += 1
 
                         for name in to_delete:
                             remaining.remove(name)
 
-                        to_delete = []
-                        for name, result in results.items():
-                            if result.ready():
-                                try:
-                                    result.get()
-                                    self.finish_progress_bar(name, success=True)
-                                except Exception as err:
-                                    self.finish_progress_bar(name, success=False)
-                                    num_exceptions += 1
-                                    logging.error(err)
-
-                                self.blocks[name].complete = True
-                                to_delete.append(name)
-
-                        for name in to_delete:
-                            results.pop(name)
-
                         sleep(.1)
+                else:
+                    with Pool(processes=nprocs) as pool:
+                        results = dict()
+                        remaining = list(blocks_to_execute.keys())
+                        num_blocks_ran = 0
+                        num_exceptions = 0
+                        while remaining or results:
+                            to_delete = []
+                            for name in remaining:
+                                block = blocks_to_execute[name]
+                                if self.ready_to_run(block):
+                                    results[name] = pool.apply_async(execute_block, 
+                                            (block, name, self.mpi_rank, self.instances, self.args.cache_time, num_blocks_ran, self.num_blocks_executed))
+                                    self.progress_bars[name] = num_blocks_ran
+                                    to_delete.append(name)
+                                    num_blocks_ran += 1
 
-                    if USE_SERVER:
-                        t = threading.Thread(target=self.listening_thread) 
-                        t.start()
+                            for name in to_delete:
+                                remaining.remove(name)
 
-                    pool.close()
-                    pool.join()
+                            to_delete = []
+                            for name, result in results.items():
+                                if result.ready():
+                                    try:
+                                        result.get()
+                                        self.finish_progress_bar(name, success=True)
+                                    except Exception as err:
+                                        self.finish_progress_bar(name, success=False)
+                                        num_exceptions += 1
+                                        logging.error(err)
 
-                    for i in range(1+ min(self.num_blocks_executed, NUM_ROWS)):
-                        print()
-                    
-                    self.complete = True
+                                    self.blocks[name].complete = True
+                                    to_delete.append(name)
 
-                    if blocks_to_execute and self.mpi_rank == 0:
-                        self.notifications.append(partial(notify.send_finish_message,
-                                                    filename=self.filename, 
-                                                    njobs=len(blocks_to_execute),
-                                                    time=time() - t_start,
-                                                    num_exceptions=num_exceptions))
-                    
-                    if USE_SERVER:
-                        t.join()
-                        self.pipe.close()
+                            for name in to_delete:
+                                results.pop(name)
 
-                    display.cached_function_summary(self.num_blocks_executed, num_exceptions)
+                            sleep(.1)
+
+                        if USE_SERVER:
+                            t = threading.Thread(target=self.listening_thread) 
+                            t.start()
+
+                        pool.close()
+                        pool.join()
+
+                        for i in range(1+ min(self.num_blocks_executed, NUM_ROWS)):
+                            print()
+                        
+                        self.complete = True
+
+                        if blocks_to_execute and self.mpi_rank == 0:
+                            self.notifications.append(partial(notify.send_finish_message,
+                                                        filename=self.filename, 
+                                                        njobs=len(blocks_to_execute),
+                                                        time=time() - t_start,
+                                                        num_exceptions=num_exceptions))
+                        
+                        if USE_SERVER:
+                            t.join()
+                            self.pipe.close()
+
+                        display.cached_function_summary(self.num_blocks_executed, num_exceptions)
 
         ### At-end functions
         if self.mpi_rank == 0:
