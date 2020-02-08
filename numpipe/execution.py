@@ -20,6 +20,8 @@ from numpipe.h5cache import h5cache
 from numpipe.utility import once
 from numpipe import display, config
 
+NUM_ROWS = config.get_terminal_rows()
+
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
     def __init__(self, function, args=(), kwargs={}, num_iterations=None):
@@ -95,7 +97,7 @@ class block:
 def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, total):
     ascii_value = config.get_config()['tqdm']['ascii']
     desc = f'({1+tqdm_position}/{total}) {name}'
-    numpipe.tqdm = partial(numpipe.tqdm, position=tqdm_position+1, desc=desc, ascii=ascii_value)
+    numpipe.tqdm = partial(numpipe.tqdm, position=1 + tqdm_position % NUM_ROWS, desc=desc, ascii=ascii_value)
     tqdm.tqdm = partial(numpipe.tqdm, position=tqdm_position+1, desc=desc)
     pbar = numpipe.tqdm()
     pbar.close()

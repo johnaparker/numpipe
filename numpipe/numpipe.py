@@ -27,13 +27,14 @@ import traceback
 from termcolor import colored
 
 import numpipe
-from numpipe import slurm, display, notify, mpl_tools
+from numpipe import slurm, display, notify, mpl_tools, config
 from numpipe.execution import deferred_function, target, block, execute_block
 from numpipe.utility import doublewrap
 from numpipe.parser import run_parser
 from numpipe.networking import recv_msg,send_msg
 
 USE_SERVER = False
+NUM_ROWS = config.get_terminal_rows()
 
 class scheduler:
     """Deferred function evaluation and access to cached function output"""
@@ -225,7 +226,7 @@ class scheduler:
                     pool.close()
                     pool.join()
 
-                    for i in range(1+self.num_blocks_executed):
+                    for i in range(1+ min(self.num_blocks_executed, NUM_ROWS)):
                         print()
                     
                     self.complete = True
@@ -251,7 +252,7 @@ class scheduler:
 
     def finish_progress_bar(self, name, success):
         pos = self.progress_bars[name]
-        pbar = numpipe.tqdm(position=pos+1)
+        pbar = numpipe.tqdm(position=1 + pos % NUM_ROWS)
 
         pbar.unit = '\b'*4
         N = 11
