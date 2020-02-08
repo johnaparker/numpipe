@@ -2,8 +2,8 @@ CRITICAL ISSUES
     * if @cache function throws an exception after yields have occured, no results are saved (results should be dumped after an exception)
 
 FEATURE: DEPENDENCY
+    * check for circular dependencies
     * print something useful when simulations are being re-ran due to dependencies
-    * allow dependency for instanaces
     * If B depends on A, and A throws an error.... do something
     * more sophisticated tree dependency checking
     * implicit dependencies using job.load

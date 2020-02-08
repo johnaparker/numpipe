@@ -24,6 +24,6 @@ def D():
     return dict(x=2)
 
 job.add_instance(C, i=0)
-job.add_instance(C, i=1)
+job.add_instance(C, i=1).depends(B)
 
 job.execute()

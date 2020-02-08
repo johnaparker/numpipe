@@ -82,17 +82,21 @@ class block:
         self.deferred_function = deferred_function
         self.target = target
 
+        self.dependencies = []
+        self.children = []
+        self.complete = False
+
+        self.depends(dependencies)
+
+    def depends(self, dependencies):
         if dependencies is not None:
             f = lambda D: D if isinstance(D, str) else D.__name__
             if isinstance(dependencies, str) or not isinstance(dependencies, Iterable):
-                self.dependencies = [f(dependencies)]
+                new_deps = f(dependencies)
             else:
-                self.dependencies = [f(D) for D in dependencies]
-        else:
-            self.dependencies = []
+                new_deps = [f(D) for D in dependencies]
 
-        self.children = []
-        self.complete = False
+            self.dependencies.extend(new_deps)
 
 # @yield_traceback
 def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, total):

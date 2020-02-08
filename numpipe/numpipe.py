@@ -300,25 +300,24 @@ class scheduler:
                 print('progress sent')
 
     # @static_vars(counter=0)
-    def add_instance(self, func, instance_name=None, **kwargs):
+    def add_instance(self, _func, _instance_name=None, **kwargs):
         """
         Add an instance (a function with specified kwargs)
         """
-        if instance_name is None:
-            instance_name = str(len(self.instances[func.__name__]))
+        if _instance_name is None:
+            _instance_name = str(len(self.instances[_func.__name__]))
 
-        block_name = f'{func.__name__}-{instance_name}'
+        block_name = f'{_func.__name__}-{_instance_name}'
         filepath = f'{self.dirpath}/{self.filename}-{block_name}.h5'
 
-        depends = self.instance_dependency.get(func.__name__)
-        
         self.blocks[block_name] = block(
-                          deferred_function(func, kwargs=kwargs, num_iterations=None),
-                          target(filepath),
-                          dependencies=depends)
-        self.instances[func.__name__].append(block_name)
+                          deferred_function(_func, kwargs=kwargs, num_iterations=None),
+                          target(filepath))
+        self.instances[_func.__name__].append(block_name)
 
-    def add_instances(self, func, instances):
+        return self.blocks[block_name]
+
+    def add_instances(self, _func, instances):
         """
         Add multiple instances
 
@@ -342,7 +341,10 @@ class scheduler:
         else:
             self.instances[func.__name__] = []
             if depends is not None:
-                self.instance_dependency[func.__name__] = depends
+                if isinstance(depends, str) or not isinstance(depends, Iterable):
+                    self.instance_dependency[func.__name__] = [depends]
+                else:
+                    self.instance_dependency[func.__name__] = depends
 
         return func
 
