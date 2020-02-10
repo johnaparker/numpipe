@@ -1,3 +1,5 @@
+import numpy as np
+
 class parameter():
     def __init__(self, arg, axis=None, gather=False, outer=False, labels=None):
         """a parameter for input to the scheduler.add function
@@ -9,7 +11,7 @@ class parameter():
             outer     whether to perform an outer product over other parameters (default: False)
             labels    label for each argument to be added to the filename (default: none)
         """
-        self.arg = arg
+        self.arg = np.asarray(arg)
         self.axis = axis
         self.gather = gather
         self.outer = outer

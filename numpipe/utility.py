@@ -4,6 +4,7 @@ Utility functions and classes
 
 from functools import wraps
 import traceback
+import numpy as np
 
 class once(dict):
     """identical to dict; used to yield something only once"""
@@ -73,3 +74,18 @@ class first_argument:
                 yield current_iteration[self.name].value
                 current_iteration[self.name].value += 1
         return gen()
+
+def flatten_along(arr, axis=None):
+    """flatten an array along a give axis / axes"""
+    if axis is None:
+        return arr.flatten()
+    else:
+        if np.isscalar(axis):
+            arr = np.moveaxis(arr, axis, 0)
+        else:
+            axis = sorted(axis)
+            for i,ax in enumerate(axis):
+                arr = np.moveaxis(arr, ax, i)
+            shape = arr.shape[len(axis):]
+            arr = arr.reshape((-1,) + shape)
+        return arr

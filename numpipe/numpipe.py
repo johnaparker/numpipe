@@ -31,7 +31,7 @@ import itertools
 import numpipe
 from numpipe import slurm, display, notify, mpl_tools, config
 from numpipe.execution import deferred_function, target, block, execute_block, execute_block_debug
-from numpipe.utility import doublewrap
+from numpipe.utility import doublewrap, flatten_along
 from numpipe.parser import run_parser
 from numpipe.networking import recv_msg,send_msg
 
@@ -331,9 +331,9 @@ class scheduler:
         for key, val in kwargs.items():
             if isinstance(val, numpipe.parameter):
                 if val.outer:
-                    kwarg_params_outer[key] = val.arg
+                    kwarg_params_outer[key] = flatten_along(val.arg, axis=val.axis)
                 else:
-                    kwarg_params[key] = val.arg
+                    kwarg_params[key] = flatten_along(val.arg, axis=val.axis)
 
         if kwarg_params_outer and kwarg_params:
             for vals1 in itertools.product(*kwarg_params_outer.values()):
