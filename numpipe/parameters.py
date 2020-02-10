@@ -23,7 +23,11 @@ def gather(params, axis=None, outer=False):
         axis      axis / axes over which to gather (default: all)
         outer     whether to perform an outer product over the parameters (default: False)
     """
-    pass
+    all_params = dict()
+    for name, val in params.items():
+        all_params[name] = parameter(val, axis=axis, outer=outer, gather=True)
+
+    return all_params
 
 def outer(params, axis=None, gather=False):
     """a collection of parameters to be gathered together in an outer product
@@ -33,4 +37,8 @@ def outer(params, axis=None, gather=False):
         axis      axis / axes over which to gather (default: all)
         gather    whether to gather results together at the end (default: False)
     """
-    pass
+    all_params = dict()
+    for name, val in params.items():
+        all_params[name] = parameter(val, axis=axis, gather=gather, outer=True)
+
+    return all_params
