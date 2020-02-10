@@ -1,4 +1,5 @@
 import numpy as np
+from numpipe.utility import flatten_along
 
 class parameter():
     def __init__(self, arg, axis=None, gather=False, outer=False, labels=None):
@@ -11,11 +12,15 @@ class parameter():
             outer     whether to perform an outer product over other parameters (default: False)
             labels    label for each argument to be added to the filename (default: none)
         """
-        self.arg = np.asarray(arg)
+        self.arg = flatten_along(np.asarray(arg), axis)
         self.axis = axis
         self.gather = gather
         self.outer = outer
         self.labels = labels
+        if self.labels is None:
+            self.labels = ['']*len(self.arg)
+        else:
+            self.labels = [str(l) for l in labels]
 
 def gather(params, axis=None, outer=False):
     """a collection of parameters to be gathered together at the end

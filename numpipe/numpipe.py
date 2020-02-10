@@ -31,7 +31,7 @@ import itertools
 import numpipe
 from numpipe import slurm, display, notify, mpl_tools, config
 from numpipe.execution import deferred_function, target, block, execute_block, execute_block_debug
-from numpipe.utility import doublewrap, flatten_along
+from numpipe.utility import doublewrap
 from numpipe.parser import run_parser
 from numpipe.networking import recv_msg,send_msg
 
@@ -125,6 +125,7 @@ class scheduler:
     def execute(self):
         """Run the requested cached functions and at-end functions"""
         self.args = run_parser()
+        self.fix_block_names()
 
         ### display only event
         if self.args.action == 'display':
@@ -140,7 +141,6 @@ class scheduler:
             return
 
         numpipe._tqdm_mininterval = self.args.tqdm
-        self.fix_block_names()
         
         self.num_blocks_executed = 0
         if not self.args.at_end:
@@ -330,48 +330,78 @@ class scheduler:
         """
         Add an instance (a function with specified kwargs)
         """
+        if _instance_name is None:
+            _instance_name = ''
+
+        def get_new_name(name, addons):
+            if name and not addons:
+                return name
+            elif name and addons:
+                return name + '-' + '-'.join(addons)
+            else:
+                return '-'.join(addons)
+
         kwarg_params = dict()
         kwarg_params_outer = dict()
         for key, val in kwargs.items():
             if isinstance(val, numpipe.parameter):
                 if val.outer:
-                    kwarg_params_outer[key] = flatten_along(val.arg, axis=val.axis)
+                    kwarg_params_outer[key] = val
                 else:
-                    kwarg_params[key] = flatten_along(val.arg, axis=val.axis)
+                    kwarg_params[key] = val
 
         if kwarg_params_outer and kwarg_params:
-            for vals1 in itertools.product(*kwarg_params_outer.values()):
-                for vals2 in zip(*kwarg_params.values()):
+            args1 = [p.arg for p in kwarg_params_outer.values()]
+            labels1 = itertools.product(*[p.labels for p in kwarg_params_outer.values()])
+
+            for vals1 in itertools.product(*args1):
+                post1 = list(filter(lambda x: x, next(labels1)))
+
+                args2 = [p.arg for p in kwarg_params.values()]
+                labels2 = zip(*[p.labels for p in kwarg_params.values()])
+                for vals2 in zip(*args2):
                     new_kwargs = copy(kwargs)
                     replace = dict(zip(kwarg_params.keys(), vals2))
                     replace.update(zip(kwarg_params_outer.keys(), vals1))
                     new_kwargs.update(replace)
-                    self.add(_func, _instance_name, **new_kwargs)
+
+                    post2 = post1 + list(filter(lambda x: x, next(labels2)))
+                    new_name = get_new_name(_instance_name, post2)
+
+                    self.add(_func, new_name, **new_kwargs)
 
             return #TODO: return a block_collection that can call depends() on all or be indexed
         elif kwarg_params_outer:
-            for vals in itertools.product(*kwarg_params_outer.values()):
+            args = [p.arg for p in kwarg_params_outer.values()]
+            labels = itertools.product(*[p.labels for p in kwarg_params_outer.values()])
+            for vals in itertools.product(*args):
                 new_kwargs = copy(kwargs)
                 replace = dict(zip(kwarg_params_outer.keys(), vals))
                 new_kwargs.update(replace)
-                self.add(_func, _instance_name, **new_kwargs)
+                
+                post = filter(lambda x: x, next(labels))
+                new_name = get_new_name(_instance_name, post)
+                self.add(_func, new_name, **new_kwargs)
 
             return #TODO: return a block_collection that can call depends() on all or be indexed
         elif kwarg_params:
-            for vals in zip(*kwarg_params.values()):
+            args = [p.arg for p in kwarg_params.values()]
+            labels = zip(*[p.labels for p in kwarg_params.values()])
+            for vals in zip(*args):
                 new_kwargs = copy(kwargs)
                 replace = dict(zip(kwarg_params.keys(), vals))
                 new_kwargs.update(replace)
-                self.add(_func, _instance_name, **new_kwargs)
+
+                post = filter(lambda x: x, next(labels))
+                new_name = get_new_name(_instance_name, post)
+                self.add(_func, new_name, **new_kwargs)
 
             return #TODO: return a block_collection that can call depends() on all or be indexed
 
-        if _instance_name is None:
-            _instance_name = ''
         if _instance_name in self.instance_counts[_func.__name__]:
             self.instance_counts[_func.__name__][_instance_name] += 1
         else:
-            self.instance_counts[_func.__name__][_instance_name] = 1
+            self.instance_counts[_func.__name__][_instance_name] = 0
 
         count = self.instance_counts[_func.__name__][_instance_name]
 
@@ -389,22 +419,11 @@ class scheduler:
 
         return self.blocks[block_name]
 
-    def add_instances(self, _func, instances):
-        """
-        Add multiple instances
-
-        Arguments:
-            func        cached function
-            instances   dictionary of name: dict(kwargs)
-        """
-        for instance_name, kwargs in instances.items():
-            self.add(func, instance_name, **kwargs)
-
     def fix_block_names(self):
         for func_name, D in self.instance_counts.items():
             for name, counts in D.items():
-                if counts == 1:
-                    old_block_name = f'{func_name}-{name}-1' if name else f'{func_name}-1'
+                if counts == 0:
+                    old_block_name = f'{func_name}-{name}-0' if name else f'{func_name}-0'
                     new_block_name = f'{func_name}-{name}' if name else f'{func_name}'
                     self.blocks[new_block_name] = self.blocks[old_block_name]
                     self.blocks.pop(old_block_name)

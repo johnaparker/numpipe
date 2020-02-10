@@ -9,15 +9,14 @@ FEATURE: DEPENDENCY
 
 FEATURE: NOTIFICATIONS
     * notifications of simulation finishing when there is no @plots
-    * RCC: can we add a single python --at-end call that runs after all others have finished? (runs with --no-show and --no-delay)
+    ! * RCC: can we add a single python --at-end call that runs after all others have finished? (runs with --no-show and --no-delay)
     * deal with multiple @plots
 
 NEW FEATURES
-    * add(...).aggregate(...) or @job.cache(aggregate=...) to perform parallel execution for a single target (h5 file), automatically broadcast based on the input shape
+    ! * add(...).aggregate(...) or @job.cache(aggregate=...) to perform parallel execution for a single target (h5 file), automatically broadcast based on the input shape
     * log summary for each block: run-time, exceptions, etc
     * save animations in parallel (each process needs to call the undecorated @plots function to generate its respective animation)
     * command-line save figure options: file format (svg, pdf, etc.), dpi, bbox_inches, etc.
-    * parallel execution with a single h5 file (not add_instance, perhaps add_piece to fill part of the h5file)
     * defer load option to read only part of the h5file
 
 CODE IMPROVEMENTS

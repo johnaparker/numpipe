@@ -75,7 +75,7 @@ def display_message(blocks, instances, at_end_functions):
         print('    ', colored(name, color='yellow'), ' -- ', func.__doc__, sep='')
         print('      ', f'[{len(labels)} instances] ', end='')
         for label in labels:
-            subname = label.split('-')[1]
+            subname = '-'.join(label.split('-')[1:])
             print(subname, end=' ')
         print('')
 
