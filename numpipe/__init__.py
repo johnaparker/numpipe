@@ -24,6 +24,8 @@ from . import display
 from . import notify
 from . import config
 from . import mpl_tools
+from . import parameters
 
 from .utility import once
 from .numpipe import scheduler
+from .parameters import parameter, gather, outer

@@ -325,6 +325,20 @@ class scheduler:
         """
         Add an instance (a function with specified kwargs)
         """
+        kwarg_params = dict()
+        for key, val in kwargs.items():
+            if isinstance(val, numpipe.parameter):
+                kwarg_params[key] = val.arg
+
+        if kwarg_params:
+            for vals in zip(*kwarg_params.values()):
+                new_kwargs = copy(kwargs)
+                replace = dict(zip(kwarg_params.keys(), vals))
+                new_kwargs.update(replace)
+                self.add(_func, _instance_name, **new_kwargs)
+
+            return #TODO: return a block_collection that can call depends() on all or be indexed
+
         if _instance_name is None:
             _instance_name = str(len(self.instances[_func.__name__]))
 
