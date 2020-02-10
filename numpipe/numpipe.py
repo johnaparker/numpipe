@@ -44,6 +44,7 @@ class scheduler:
     def __init__(self, dirpath=None):
         self.blocks = dict()
         self.instances = dict()
+        self.instance_counts = dict()
         self.instance_dependency = dict()
         self.at_end_functions = dict()
         self.animations = dict() 
@@ -137,6 +138,7 @@ class scheduler:
             return
 
         numpipe._tqdm_mininterval = self.args.tqdm
+        self.fix_block_names()
         
         self.num_blocks_executed = 0
         if not self.args.at_end:
@@ -363,9 +365,19 @@ class scheduler:
             return #TODO: return a block_collection that can call depends() on all or be indexed
 
         if _instance_name is None:
-            _instance_name = str(len(self.instances[_func.__name__]))
+            _instance_name = ''
+        if _instance_name in self.instance_counts[_func.__name__]:
+            self.instance_counts[_func.__name__][_instance_name] += 1
+        else:
+            self.instance_counts[_func.__name__][_instance_name] = 1
 
-        block_name = f'{_func.__name__}-{_instance_name}'
+        count = self.instance_counts[_func.__name__][_instance_name]
+
+        if _instance_name:
+            block_name = f'{_func.__name__}-{_instance_name}-{count}'
+        else:
+            block_name = f'{_func.__name__}-{count}'
+
         filepath = f'{self.dirpath}/{self.filename}-{block_name}.h5'
 
         self.blocks[block_name] = block(
@@ -386,6 +398,21 @@ class scheduler:
         for instance_name, kwargs in instances.items():
             self.add(func, instance_name, **kwargs)
 
+    def fix_block_names(self):
+        for func_name, D in self.instance_counts.items():
+            for name, counts in D.items():
+                if counts == 1:
+                    old_block_name = f'{func_name}-{name}-1' if name else f'{func_name}-1'
+                    new_block_name = f'{func_name}-{name}' if name else f'{func_name}'
+                    self.blocks[new_block_name] = self.blocks[old_block_name]
+                    self.blocks.pop(old_block_name)
+
+                    index = self.instances[func_name].index(old_block_name)
+                    self.instances[func_name][index] = new_block_name
+
+                    filepath = f'{self.dirpath}/{self.filename}-{new_block_name}.h5'
+                    self.blocks[new_block_name].target.filepath = filepath
+
     @doublewrap
     def cache(self, func, depends=None):
         """decorator to add a cached function to be conditionally ran"""
@@ -398,6 +425,7 @@ class scheduler:
                         dependencies=depends)
         else:
             self.instances[func.__name__] = []
+            self.instance_counts[func.__name__] = dict()
             if depends is not None:
                 if isinstance(depends, str) or not isinstance(depends, Iterable):
                     self.instance_dependency[func.__name__] = [depends]
