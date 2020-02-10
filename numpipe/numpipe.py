@@ -90,6 +90,8 @@ class scheduler:
         """
 
         func_name = function.__name__
+        if not isinstance(instance, str) and isinstance(instance, Iterable):
+            instance = '-'.join([str(x) for x in instance])
 
         if func_name in self.instances.keys():
             if instance is None:
