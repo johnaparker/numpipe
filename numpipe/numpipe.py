@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import traceback
 from termcolor import colored
 from copy import copy
+import itertools
 
 import numpipe
 from numpipe import slurm, display, notify, mpl_tools, config
@@ -326,11 +327,33 @@ class scheduler:
         Add an instance (a function with specified kwargs)
         """
         kwarg_params = dict()
+        kwarg_params_outer = dict()
         for key, val in kwargs.items():
             if isinstance(val, numpipe.parameter):
-                kwarg_params[key] = val.arg
+                if val.outer:
+                    kwarg_params_outer[key] = val.arg
+                else:
+                    kwarg_params[key] = val.arg
 
-        if kwarg_params:
+        if kwarg_params_outer and kwarg_params:
+            for vals1 in itertools.product(*kwarg_params_outer.values()):
+                for vals2 in zip(*kwarg_params.values()):
+                    new_kwargs = copy(kwargs)
+                    replace = dict(zip(kwarg_params.keys(), vals2))
+                    replace.update(zip(kwarg_params_outer.keys(), vals1))
+                    new_kwargs.update(replace)
+                    self.add(_func, _instance_name, **new_kwargs)
+
+            return #TODO: return a block_collection that can call depends() on all or be indexed
+        elif kwarg_params_outer:
+            for vals in itertools.product(*kwarg_params_outer.values()):
+                new_kwargs = copy(kwargs)
+                replace = dict(zip(kwarg_params_outer.keys(), vals))
+                new_kwargs.update(replace)
+                self.add(_func, _instance_name, **new_kwargs)
+
+            return #TODO: return a block_collection that can call depends() on all or be indexed
+        elif kwarg_params:
             for vals in zip(*kwarg_params.values()):
                 new_kwargs = copy(kwargs)
                 replace = dict(zip(kwarg_params.keys(), vals))
