@@ -144,6 +144,7 @@ class scheduler:
         
         self.num_blocks_executed = 0
         if not self.args.at_end:
+
             ### determine which functions to execute based on file and command line
             if self.args.rerun is None:
                 blocks_to_execute = {name: block for name, block in self.blocks.items() if not block.target.exists()}
@@ -167,6 +168,8 @@ class scheduler:
             aborting = MPI.COMM_WORLD.bcast(aborting, root=0)
             if aborting:
                 return
+
+            self.resolve_dependencies(blocks_to_execute) #TODO: this call is only needed to update the block.complete status after the files (targets) have been deleted; separate into two functions
 
             if self.args.action == 'slurm':
                 slurm.create_lookup(self.filename, blocks_to_execute.keys())
@@ -200,6 +203,7 @@ class scheduler:
                                 execute_block_debug(block, name, self.mpi_rank, self.instances,
                                          self.args.cache_time, num_blocks_ran, self.num_blocks_executed)
                                 to_delete.append(name)
+                                block.complete = True
                                 num_blocks_ran += 1
 
                         for name in to_delete:
@@ -414,7 +418,8 @@ class scheduler:
 
         self.blocks[block_name] = block(
                           deferred_function(_func, kwargs=kwargs, num_iterations=None),
-                          target(filepath))
+                          target(filepath),
+                          dependencies=self.instance_dependency.get(_func.__name__, None))
         self.instances[_func.__name__].append(block_name)
 
         return self.blocks[block_name]
@@ -634,19 +639,19 @@ class scheduler:
                     block_dependencies = new_blocks
 
 
-            # UP the tree
-            block_dependencies = blocks
-            while block_dependencies:
-                new_blocks = dict()
-                for label, block in block_dependencies.items():
-                    for dependency in block.dependencies:
-                        if not self.blocks[dependency].target.exists():
-                            new_blocks[dependency] = self.blocks[dependency]
-                        else:
-                            self.blocks[dependency].complete = True
+        # UP the tree
+        block_dependencies = blocks
+        while block_dependencies:
+            new_blocks = dict()
+            for label, block in block_dependencies.items():
+                for dependency in block.dependencies:
+                    if not self.blocks[dependency].target.exists():
+                        new_blocks[dependency] = self.blocks[dependency]
+                    else:
+                        self.blocks[dependency].complete = True
 
-                blocks.update(new_blocks)
-                block_dependencies = new_blocks
+            blocks.update(new_blocks)
+            block_dependencies = new_blocks
 
     def delete(self):
         """

@@ -92,7 +92,7 @@ class block:
         if dependencies is not None:
             f = lambda D: D if isinstance(D, str) else D.__name__
             if isinstance(dependencies, str) or not isinstance(dependencies, Iterable):
-                new_deps = f(dependencies)
+                new_deps = [f(dependencies)]
             else:
                 new_deps = [f(D) for D in dependencies]
 
