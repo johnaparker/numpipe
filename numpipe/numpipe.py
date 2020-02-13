@@ -156,7 +156,7 @@ class scheduler:
                     labels = self.get_labels(name)
                     blocks_to_execute.update({label: self.blocks[label] for label in labels})
 
-            self.resolve_dependencies(blocks_to_execute)
+            self.resolve_dependencies_down(blocks_to_execute)
 
             self.num_blocks_executed = len(blocks_to_execute)
             aborting = False
@@ -169,7 +169,7 @@ class scheduler:
             if aborting:
                 return
 
-            self.resolve_dependencies(blocks_to_execute) #TODO: this call is only needed to update the block.complete status after the files (targets) have been deleted; separate into two functions
+            self.resolve_dependencies_up(blocks_to_execute)
 
             if self.args.action == 'slurm':
                 slurm.create_lookup(self.filename, blocks_to_execute.keys())
@@ -612,7 +612,7 @@ class scheduler:
 
         raise ValueError(f"Invalid argument: function '{name}' does not correspond to any cached function")
 
-    def resolve_dependencies(self, blocks):
+    def resolve_dependencies_down(self, blocks):
         for label, block in self.blocks.items():
             for D in copy(block.dependencies):
                 all_deps = self.instances.get(D)
@@ -639,6 +639,7 @@ class scheduler:
                     block_dependencies = new_blocks
 
 
+    def resolve_dependencies_up(self, blocks):
         # UP the tree
         block_dependencies = blocks
         while block_dependencies:

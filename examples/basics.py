@@ -40,9 +40,10 @@ def sim4(param):
 def sim5():
     pass
 
-job.add(sim4, param=2)
-job.add(sim4, param=3)
-job.add(sim4, param=4)
+job.add(sim4, 'A', param=2)
+job.add(sim4, 'A', param=3)
+job.add(sim4, 'A', param=4)
+job.add(sim4, 'B', param=4)
 
 @job.at_end
 def vis():
@@ -52,8 +53,7 @@ def vis():
     cache = job.load(sim2)
     plt.plot(x, cache.z)
 
-    cache = job.load(sim4, 2)
-    for name, cache in job.load(sim4):
+    for name, cache in job.load(sim4, 'A'):
         print(f'{name} instance has y = {cache.y} with param = {cache.args.param}')
     # with job.load(sim4, defer=True) as cache:
     plt.show()
