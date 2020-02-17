@@ -99,9 +99,8 @@ class block:
             self.dependencies.extend(new_deps)
 
 # @yield_traceback
-def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, total):
-    desc = f'({1+tqdm_position}/{total}) {name}'
-    # numpipe._pbars.set_desc(colored(desc, attrs=['bold']))
+def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
+    desc = f'({1+number}/{total}) {name}'
     numpipe._pbars.set_desc(desc)
 
     cache = None
@@ -147,9 +146,9 @@ def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, t
         numpipe._pbars.fail_bar()
         raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
-def execute_block_debug(block, name, mpi_rank, instances, cache_time, tqdm_position, total):
-    desc = f'({1+tqdm_position}/{total}) {name}'
-    numpipe._pbars.set_desc(colored(desc, attrs=['bold']))
+def execute_block_debug(block, name, mpi_rank, instances, cache_time, number, total):
+    desc = f'({1+number}/{total}) {name}'
+    numpipe._pbars.set_desc(desc)
 
     try:
         func = block.deferred_function

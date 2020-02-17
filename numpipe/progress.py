@@ -18,9 +18,8 @@ def format_seconds(T):
 
     return ret
 
-
 class progress_bars:
-    def __init__(self, njobs=1, mininterval=100):
+    def __init__(self, njobs=1, mininterval=.1):
         """a collection of progress bars that work with multiprocessing"""
 
         ### per-process variables
@@ -66,7 +65,7 @@ class progress_bars:
         start_time = time()
 
         for counter, val in enumerate(it):
-            if time() - ctime > mininterval/1e3 or counter == total-1:
+            if time() - ctime > mininterval or counter == total-1:
                 fraction = counter/(total-1)
                 cols = int(fraction*self.pbar_col)
 

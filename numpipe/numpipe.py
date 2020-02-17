@@ -127,6 +127,7 @@ class scheduler:
     def execute(self):
         """Run the requested cached functions and at-end functions"""
         self.args = run_parser()
+        numpipe._pbars.mininterval = self.args.mininterval
         self.fix_block_names()
 
         ### display only event

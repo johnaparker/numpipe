@@ -99,7 +99,7 @@ ulimit -u 10000
 srun="srun --exclusive -N1 -n1"
 parallel="parallel --delay .2 -j $SLURM_NTASKS --joblog {runtask_log} --resume"
 
-$parallel "$srun python {py_filename}.py -r {{1}} -p 1 --no-at-end --tqdm 60 > {output_dir}/out_{{1}}.txt 2> {output_dir}/out_{{1}}.err" :::: {py_filename}-lookup.txt
+$parallel "$srun python {py_filename}.py -r {{1}} -p 1 --no-at-end --mininterval 60 > {output_dir}/out_{{1}}.txt 2> {output_dir}/out_{{1}}.err" :::: {py_filename}-lookup.txt
 """
     
     sbatch_filename = f'{py_filename}.sbatch'

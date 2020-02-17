@@ -3,6 +3,7 @@ from time import sleep
 
 ### Setup
 job = numpipe.scheduler()
+pbar = job.progress
 
 import numpy as np
 N = 100
@@ -11,7 +12,9 @@ T = 5
 @job.cache
 def progress(i):
     progress = 0
-    for j in numpipe.tqdm(range(N)):
+    for j in pbar(range(N)):
+        if i in (2,5,8) and j == 40:
+            raise RuntimeError
         sleep(T/N)
         yield dict()
 

@@ -40,9 +40,11 @@ def post_install():
     token = ""
     chat_id = 0
 
-[tqdm]
+[progress]
     ascii = false
     max_rows = 100
+    character = "#"
+    mininterval = 0.1
 """.strip()
 
     config_path = pathlib.Path('~/.config/numpipe/numpipe.conf').expanduser()

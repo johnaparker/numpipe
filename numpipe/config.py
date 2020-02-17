@@ -14,7 +14,7 @@ def get_config():
     return config
 
 def get_terminal_rows():
-    rows = get_config()['tqdm']['max_rows']
+    rows = get_config()['progress']['max_rows']
     actual_rows, _ = os.popen('stty size', 'r').read().split()
     actual_rows = int(actual_rows) - 1
     rows = min(rows, actual_rows)
