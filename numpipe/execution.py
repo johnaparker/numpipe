@@ -101,7 +101,8 @@ class block:
 # @yield_traceback
 def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, total):
     desc = f'({1+tqdm_position}/{total}) {name}'
-    numpipe._pbars.set_desc(colored(desc, attrs=['bold']))
+    # numpipe._pbars.set_desc(colored(desc, attrs=['bold']))
+    numpipe._pbars.set_desc(desc)
 
     cache = None
     try:

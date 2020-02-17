@@ -24,14 +24,14 @@ class progress_bars:
         """a collection of progress bars that work with multiprocessing"""
 
         ### per-process variables
-        self.bar_fmt = '{percent}|{bars}| {count} [{t_ran}<{t_left}, {iters}]'
-        self.pbar_str = ''
+        self.pbar_fmt = '{desc}{percent}|{bars}| {count} [{t_ran}<{t_left}, {iters}]'
+        self.pbar_kwargs = dict()
         self.pos = 0
         self.max_col = 119
         self.bar_symbol = '#'   #'█'
         self.pbar_col = 50
         self.mininterval = mininterval
-        self.desc = None
+        self.pbar_kwargs['desc'] = ''
 
         ### global variables
         self.lock = Lock()
@@ -44,7 +44,7 @@ class progress_bars:
 
     def set_desc(self, desc):
         """set the number of jobs"""
-        self.desc = desc
+        self.pbar_kwargs['desc'] = f'{desc}: '
 
     def progress(self, it, mininterval=None, desc=None):
         """obtain a new progress bar from an iterable"""
@@ -53,17 +53,14 @@ class progress_bars:
         if mininterval is None:
             mininterval = self.mininterval
 
-        bar_fmt = self.bar_fmt
         if desc is not None:
-            bar_fmt = f'{desc}: {self.bar_fmt}'
-        elif self.desc is not None:
-            bar_fmt = f'{self.desc}: {self.bar_fmt}'
+            self.set_desc(disc)
 
         with self.lock:
             self.pos = self.pos_g.value
             self.pos_g.value += 1
 
-            self._initialize_bar(total, bar_fmt)
+            self._initialize_bar(total)
 
         ctime = time()
         start_time = time()
@@ -78,12 +75,12 @@ class progress_bars:
                 time_left = (total - 1 - counter)/iters
                 iters_str = f'{iters:.2f}it/s' if iters > 1 else f'{1/iters:.2f}s/it'
 
-                self.pbar_str = bar_fmt.format(bars=(self.bar_symbol*cols).ljust(self.pbar_col),
-                                               percent=f'{fraction*100:.0f}%'.rjust(4),
-                                               count=f'({counter+1}/{total})',
-                                               t_ran=format_seconds(time_passed),
-                                               iters=iters_str,
-                                               t_left=format_seconds(time_left))
+                self.pbar_kwargs.update(dict(bars=(self.bar_symbol*cols).ljust(self.pbar_col),
+                                             percent=f'{fraction*100:.0f}%'.rjust(4),
+                                             count=f'{counter+1}/{total}',
+                                             t_ran=format_seconds(time_passed),
+                                             iters=iters_str,
+                                             t_left=format_seconds(time_left)))
 
                 with self.lock:
                     if counter == total-1:
@@ -97,15 +94,14 @@ class progress_bars:
 
     def finish_bar(self):
         """set the bar status to complete"""
-        # self.pbar_str = colored(('PASSED ' + self.pbar_str).ljust(self.max_col), color='green')
-        self.pbar_str = (colored('PASSED ', color='green') + self.pbar_str).ljust(self.max_col)
+        self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='green', attrs=['bold'])
         self._write_pbar_str(flush=False)
         self._move_bar()
 
     def fail_bar(self):
         """set the bar status to failure"""
         with self.lock:
-            self.pbar_str = colored(('FAILED ' + self.pbar_str).ljust(self.max_col), color='red')
+            self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='red', attrs=['bold'])
             self._write_pbar_str(flush=False)
             self._move_bar()
 
@@ -121,16 +117,15 @@ class progress_bars:
             if val > pos:
                 self.pos_arr[i] -= 1
 
-    def _initialize_bar(self, total, bar_fmt=None):
+    def _initialize_bar(self, total):
         """initialize and display the pbar"""
-        pbar = bar_fmt.format(bars=''.ljust(self.pbar_col),
-                              percent=f'0%'.rjust(4),
-                              count=f'(0/{total})',
-                              t_ran=format_seconds(0),
-                              iters='?it/s',
-                              t_left='?')
+        self.pbar_kwargs.update(dict(bars=''.ljust(self.pbar_col),
+                                     percent=f'0%'.rjust(4),
+                                     count=f'(0/{total})',
+                                     t_ran=format_seconds(0),
+                                     iters='?it/s',
+                                     t_left='?'))
 
-        self.pbar_str = pbar
         self._write_pbar_str()
 
     def _clear_line(self, flush=True):
@@ -139,7 +134,8 @@ class progress_bars:
 
     def _write_pbar_str(self, pos=None, flush=True):
         """write the current pbar string"""
-        self._write_line(self.pbar_str, pos=pos, flush=flush)
+        pbar_str = self.pbar_fmt.format(**self.pbar_kwargs)
+        self._write_line(pbar_str, pos=pos, flush=flush)
 
     def _write_line(self, line, pos=None, flush=True):
         """write a line at a given position"""
