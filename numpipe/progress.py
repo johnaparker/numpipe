@@ -95,10 +95,6 @@ class progress_bars:
 
                 with self.lock:
                     self._write_pbar_str()
-                    # if counter == total-1:
-                        # self.finish_bar(move=False)
-                    # else:
-                        # self._write_pbar_str()
 
                 ctime = time()
 
@@ -129,6 +125,7 @@ class progress_bars:
 
     def _move_bar(self, line=None):
         """move the pbar to cursor and move the cursor down"""
+        self.complete = True
         pos = self.pos_arr[self.pos]
 
         self._clear_line(flush=False)
