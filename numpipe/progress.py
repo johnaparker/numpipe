@@ -33,6 +33,7 @@ class progress_bars:
         self.pbar_kwargs['desc'] = ''
         self.placeholder = False
         self.complete = True
+        self.auto_serial = False
 
         ### global variables
         self.lock = Lock()
@@ -95,6 +96,8 @@ class progress_bars:
 
                 with self.lock:
                     self._write_pbar_str()
+                    if self.auto_serial and counter == total-1:
+                        print()
 
                 ctime = time()
 
@@ -122,6 +125,10 @@ class progress_bars:
                 self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='red', attrs=['bold'])
                 self._write_pbar_str(flush=False)
                 self._move_bar()
+
+    def reset(self):
+        with self.lock:
+            self.pos_g.value = 0
 
     def _move_bar(self, line=None):
         """move the pbar to cursor and move the cursor down"""

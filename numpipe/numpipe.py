@@ -271,6 +271,11 @@ class scheduler:
 
                         display.cached_function_summary(self.num_blocks_executed, num_exceptions)
 
+        numpipe._pbars.set_njobs(1)
+        numpipe._pbars.reset()
+        numpipe._pbars.auto_serial = True
+        
+
         ### At-end functions
         if self.mpi_rank == 0:
             if self.at_end_functions and not self.args.no_at_end:
