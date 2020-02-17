@@ -31,6 +31,7 @@ class progress_bars:
         self.pbar_col = 50
         self.mininterval = mininterval
         self.pbar_kwargs['desc'] = ''
+        self.placeholder = False
 
         ### global variables
         self.lock = Lock()
@@ -45,6 +46,10 @@ class progress_bars:
         """set the number of jobs"""
         self.pbar_kwargs['desc'] = f'{desc}: '
 
+    def make_placeholder(self, desc=None):
+        next(self.progress(range(100), desc=desc))
+        self.placeholder = True
+
     def progress(self, it, mininterval=None, desc=None):
         """obtain a new progress bar from an iterable"""
         total = len(it)
@@ -53,11 +58,12 @@ class progress_bars:
             mininterval = self.mininterval
 
         if desc is not None:
-            self.set_desc(disc)
+            self.set_desc(desc)
 
         with self.lock:
-            self.pos = self.pos_g.value
-            self.pos_g.value += 1
+            if not self.placeholder:
+                self.pos = self.pos_g.value
+                self.pos_g.value += 1
 
             self._initialize_bar(total)
 
@@ -66,7 +72,7 @@ class progress_bars:
 
         for counter, val in enumerate(it):
             if time() - ctime > mininterval or counter == total-1:
-                fraction = counter/(total-1)
+                fraction = (counter+1)/total
                 cols = int(fraction*self.pbar_col)
 
                 time_passed = time() - start_time
@@ -93,6 +99,7 @@ class progress_bars:
 
     def finish_bar(self):
         """set the bar status to complete"""
+        self.placeholder = False
         self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='green', attrs=['bold'])
         self._write_pbar_str(flush=False)
         self._move_bar()
@@ -100,6 +107,7 @@ class progress_bars:
     def fail_bar(self):
         """set the bar status to failure"""
         with self.lock:
+            self.placeholder = False
             self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='red', attrs=['bold'])
             self._write_pbar_str(flush=False)
             self._move_bar()

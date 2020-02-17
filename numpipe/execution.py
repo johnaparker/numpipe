@@ -100,6 +100,7 @@ class block:
 def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
     desc = f'({1+number}/{total}) {name}'
     numpipe._pbars.set_desc(desc)
+    numpipe._pbars.make_placeholder(desc)
 
     cache = None
     try:
@@ -144,9 +145,14 @@ def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
         numpipe._pbars.fail_bar()
         raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
+    if numpipe._pbars.placeholder:
+        with numpipe._pbars.lock:
+            numpipe._pbars.finish_bar()
+
 def execute_block_debug(block, name, mpi_rank, instances, cache_time, number, total):
     desc = f'({1+number}/{total}) {name}'
     numpipe._pbars.set_desc(desc)
+    numpipe._pbars.make_placeholder(desc)
 
     try:
         func = block.deferred_function
@@ -187,3 +193,7 @@ def execute_block_debug(block, name, mpi_rank, instances, cache_time, number, to
     except Exception as err:
         numpipe._pbars.fail_bar()
         raise err
+
+    if numpipe._pbars.placeholder:
+        with numpipe._pbars.lock:
+            numpipe._pbars.finish_bar()
