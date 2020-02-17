@@ -1,6 +1,5 @@
 import pathlib
 import toml
-import os
 
 def get_config_path():
     """get the path to the configuration file"""
@@ -12,7 +11,3 @@ def get_config():
     path = get_config_path()
     config = toml.load(path)
     return config
-
-def get_terminal_rows_cols():
-    rows, cols = os.popen('stty size', 'r').read().split()
-    return rows - 1, cols - 1

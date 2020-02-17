@@ -3,6 +3,14 @@ from random import random
 from multiprocessing import Pool, Lock, Value, Array
 from termcolor import colored
 from time import time
+import os
+import sys
+from termios import TIOCGWINSZ
+from fcntl import ioctl
+from array import array
+
+def get_terminal_rows_cols():
+    return array('h', ioctl(sys.stdout, TIOCGWINSZ, '\0' * 8))[:2]
 
 def format_seconds(T):
     """format time T (in seconds) to a display string"""
@@ -26,9 +34,9 @@ class progress_bars:
         self.pbar_fmt = '{desc}{percent}|{bars}| {count} [{t_ran}<{t_left}, {iters}]'
         self.pbar_kwargs = dict()
         self.pos = 0
-        self.max_col = 119
+        self.max_col = get_terminal_rows_cols()[1]
+        self.num_bars = 5
         self.character = character  # '█'
-        self.pbar_col = 50
         self.mininterval = mininterval
         self.pbar_kwargs['desc'] = ''
         self.placeholder = False
@@ -80,19 +88,25 @@ class progress_bars:
         for counter, val in enumerate(it):
             if time() - ctime > mininterval or counter == total-1:
                 fraction = (counter+1)/total
-                cols = int(fraction*self.pbar_col)
+                self.max_col = get_terminal_rows_cols()[1]
 
                 time_passed = time() - start_time
                 iters = counter/time_passed
                 time_left = (total - 1 - counter)/iters
                 iters_str = f'{iters:.2f}it/s' if iters > 1 else f'{1/iters:.2f}s/it'
+                t_ran = format_seconds(time_passed)
+                t_left = format_seconds(time_left)
 
-                self.pbar_kwargs.update(dict(bars=(self.character*cols).ljust(self.pbar_col),
+                self.num_bars = self.max_col - 14 - len(self.pbar_kwargs['desc']) - 2*len(str(total)) \
+                        - len(t_ran) - len(t_left) - len(iters_str)
+                cols = int(fraction*self.num_bars)
+
+                self.pbar_kwargs.update(dict(bars=(self.character*cols).ljust(self.num_bars),
                                              percent=f'{fraction*100:.0f}%'.rjust(4),
                                              count=f'{counter+1}/{total}',
-                                             t_ran=format_seconds(time_passed),
+                                             t_ran=t_ran,
                                              iters=iters_str,
-                                             t_left=format_seconds(time_left)))
+                                             t_left=t_left))
 
                 with self.lock:
                     self._write_pbar_str()
@@ -148,7 +162,7 @@ class progress_bars:
 
     def _initialize_bar(self, total):
         """initialize and display the pbar"""
-        self.pbar_kwargs.update(dict(bars=''.ljust(self.pbar_col),
+        self.pbar_kwargs.update(dict(bars=''.ljust(self.num_bars),
                                      percent=f'0%'.rjust(4),
                                      count=f'(0/{total})',
                                      t_ran=format_seconds(0),
@@ -159,7 +173,7 @@ class progress_bars:
 
     def _clear_line(self, flush=True):
         """clear the current line"""
-        self._write_line(' '*200, flush=flush)
+        self._write_line(' '*self.max_col, flush=flush)
 
     def _write_pbar_str(self, pos=None, flush=True):
         """write the current pbar string"""
