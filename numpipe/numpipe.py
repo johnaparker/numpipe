@@ -48,7 +48,6 @@ class scheduler:
         self.instance_dependency = dict()
         self.at_end_functions = dict()
         self.animations = dict() 
-        self.progress_bars = dict()
 
         if dirpath is None:
             self.dirpath = sys.path[0]
@@ -68,8 +67,8 @@ class scheduler:
                             format='%(levelname)s: %(message)s')
         logging.captureWarnings(True)
 
-        address = ('localhost', 6000)
         if USE_SERVER:
+            address = ('localhost', 6000)
             self.pipe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.pipe.connect(address)
             send_msg(self.pipe, pickle.dumps(['new', 'ID']))
@@ -122,6 +121,9 @@ class scheduler:
 
         return self.blocks[label].target.load()
 
+    def progress(self, it):
+        return numpipe._pbars.progress(it)
+
     def execute(self):
         """Run the requested cached functions and at-end functions"""
         self.args = run_parser()
@@ -140,8 +142,6 @@ class scheduler:
             self.delete()
             return
 
-        numpipe._tqdm_mininterval = self.args.tqdm
-        
         self.num_blocks_executed = 0
         if not self.args.at_end:
 
@@ -187,6 +187,8 @@ class scheduler:
             else:
                 nprocs = min(self.args.processes, self.num_blocks_executed)
 
+            numpipe._pbars.set_njobs(self.num_blocks_executed)
+
             t_start = time()
             if self.num_blocks_executed:
                 display.cached_function_message()
@@ -223,7 +225,6 @@ class scheduler:
                                 if self.ready_to_run(block):
                                     results[name] = pool.apply_async(execute_block, 
                                             (block, name, self.mpi_rank, self.instances, self.args.cache_time, num_blocks_ran, self.num_blocks_executed))
-                                    self.progress_bars[name] = num_blocks_ran
                                     to_delete.append(name)
                                     num_blocks_ran += 1
 
@@ -235,9 +236,7 @@ class scheduler:
                                 if result.ready():
                                     try:
                                         result.get()
-                                        self.finish_progress_bar(name, success=True)
                                     except Exception as err:
-                                        self.finish_progress_bar(name, success=False)
                                         num_exceptions += 1
                                         logging.error(err)
 
@@ -256,9 +255,6 @@ class scheduler:
                         pool.close()
                         pool.join()
 
-                        for i in range(1+ min(self.num_blocks_executed, NUM_ROWS)):
-                            print()
-                        
                         self.complete = True
 
                         if blocks_to_execute and self.mpi_rank == 0:
@@ -281,26 +277,6 @@ class scheduler:
 
                 for func in self.at_end_functions.values():
                     func()
-
-    def finish_progress_bar(self, name, success):
-        pos = self.progress_bars[name]
-        pbar = numpipe.tqdm(position=1 + pos % NUM_ROWS)
-
-        pbar.unit = '\b'*4
-        N = 11
-
-        if success:
-            color = 'green'
-            post = '[______{}______'.format(colored('PASS', color=color))
-        else:
-            color = 'red'
-            post = '[______{}______'.format(colored('FAIL', color=color))
-        pbar.set_postfix(dict(x='\b'*N + post))
-        desc = f'({1+pos}/{self.num_blocks_executed}) {name}'
-        pbar.set_description(colored(desc, color=color))
-        pbar.close()
-
-        self.progress_bars.pop(name)
 
     def ready_to_run(self, block):
         if block.dependencies is None:

@@ -12,9 +12,9 @@ from mpi4py import MPI
 import types
 from functools import partial
 import numpipe
-import tqdm
 from termcolor import colored
 
+import numpipe
 from numpipe.fileio import load_symbols, write_symbols
 from numpipe.h5cache import h5cache
 from numpipe.utility import once
@@ -100,12 +100,8 @@ class block:
 
 # @yield_traceback
 def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, total):
-    ascii_value = config.get_config()['tqdm']['ascii']
     desc = f'({1+tqdm_position}/{total}) {name}'
-    numpipe.tqdm = partial(numpipe.tqdm, position=1 + tqdm_position % NUM_ROWS, desc=desc, ascii=ascii_value)
-    tqdm.tqdm = partial(numpipe.tqdm, position=tqdm_position+1, desc=desc)
-    pbar = numpipe.tqdm()
-    pbar.close()
+    numpipe._pbars.set_desc(colored(desc, attrs=['bold']))
 
     cache = None
     try:
@@ -147,46 +143,49 @@ def execute_block(block, name, mpi_rank, instances, cache_time, tqdm_position, t
     except:
         if cache is not None:
             cache.flush()
+        numpipe._pbars.fail_bar()
         raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
 def execute_block_debug(block, name, mpi_rank, instances, cache_time, tqdm_position, total):
-    ascii_value = config.get_config()['tqdm']['ascii']
     desc = f'({1+tqdm_position}/{total}) {name}'
-    numpipe.tqdm = partial(numpipe.tqdm, desc=desc, ascii=ascii_value)
-    tqdm.tqdm = partial(numpipe.tqdm, desc=desc)
+    numpipe._pbars.set_desc(colored(desc, attrs=['bold']))
 
-    func = block.deferred_function
-    if mpi_rank == 0:
-        if func.__name__ in instances and name in instances[func.__name__]:
-            ### write arguments if instance funcitont 
-            block.target.write_args(func.kwargs)
-
-    MPI.COMM_WORLD.Barrier()
-    symbols = func()
-
-    ### Generator functions
-    if isinstance(symbols, types.GeneratorType):
-        cache = h5cache(block.target.filepath, cache_time=cache_time)
-
-        ### iterate over all symbols, caching each one
-        for next_symbols in symbols:
-            if mpi_rank == 0:
-                if type(next_symbols) is once:
-                    block.target.write(next_symbols)
-                else:
-                    for symbol_name, next_symbol in next_symbols.items():
-                        cache.add(symbol_name, next_symbol)
-
-        ### empty any of the remaining cache
+    try:
+        func = block.deferred_function
         if mpi_rank == 0:
-            cache.flush()
+            if func.__name__ in instances and name in instances[func.__name__]:
+                ### write arguments if instance funcitont 
+                block.target.write_args(func.kwargs)
 
-    ### Standard Functions
-    else:
-        if isinstance(symbols, dict):
-            block.target.write(symbols)
-        elif symbols is None:
-            block.target.write(dict())
+        MPI.COMM_WORLD.Barrier()
+        symbols = func()
+
+        ### Generator functions
+        if isinstance(symbols, types.GeneratorType):
+            cache = h5cache(block.target.filepath, cache_time=cache_time)
+
+            ### iterate over all symbols, caching each one
+            for next_symbols in symbols:
+                if mpi_rank == 0:
+                    if type(next_symbols) is once:
+                        block.target.write(next_symbols)
+                    else:
+                        for symbol_name, next_symbol in next_symbols.items():
+                            cache.add(symbol_name, next_symbol)
+
+            ### empty any of the remaining cache
+            if mpi_rank == 0:
+                cache.flush()
+
+        ### Standard Functions
         else:
-            raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
+            if isinstance(symbols, dict):
+                block.target.write(symbols)
+            elif symbols is None:
+                block.target.write(dict())
+            else:
+                raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
 
+    except Exception as err:
+        numpipe._pbars.fail_bar()
+        raise err
