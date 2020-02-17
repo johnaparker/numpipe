@@ -151,8 +151,10 @@ class progress_bars:
 
         self._clear_line(flush=False)
         if line is None:
+            self._clear_line(pos=0, flush=False)
             self._write_pbar_str(pos=0, flush=False)
         else:
+            self._clear_line(pos=0, flush=False)
             self._write_line(line, pos=0, flush=False)
         print(flush=True)
 
@@ -171,9 +173,9 @@ class progress_bars:
 
         self._write_pbar_str()
 
-    def _clear_line(self, flush=True):
+    def _clear_line(self, pos=None, flush=True):
         """clear the current line"""
-        self._write_line(' '*self.max_col, flush=flush)
+        self._write_line(' '*self.max_col, pos=pos, flush=flush)
 
     def _write_pbar_str(self, pos=None, flush=True):
         """write the current pbar string"""
