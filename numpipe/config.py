@@ -13,10 +13,6 @@ def get_config():
     config = toml.load(path)
     return config
 
-def get_terminal_rows():
-    rows = get_config()['progress']['max_rows']
-    actual_rows, _ = os.popen('stty size', 'r').read().split()
-    actual_rows = int(actual_rows) - 1
-    rows = min(rows, actual_rows)
-
-    return rows
+def get_terminal_rows_cols():
+    rows, cols = os.popen('stty size', 'r').read().split()
+    return rows - 1, cols - 1

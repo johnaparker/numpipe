@@ -19,7 +19,7 @@ def format_seconds(T):
     return ret
 
 class progress_bars:
-    def __init__(self, njobs=1, mininterval=.1):
+    def __init__(self, njobs=1, mininterval=.1, character='#'):
         """a collection of progress bars that work with multiprocessing"""
 
         ### per-process variables
@@ -27,7 +27,7 @@ class progress_bars:
         self.pbar_kwargs = dict()
         self.pos = 0
         self.max_col = 119
-        self.bar_symbol = '#'   #'█'
+        self.character = character  # '█'
         self.pbar_col = 50
         self.mininterval = mininterval
         self.pbar_kwargs['desc'] = ''
@@ -74,7 +74,7 @@ class progress_bars:
                 time_left = (total - 1 - counter)/iters
                 iters_str = f'{iters:.2f}it/s' if iters > 1 else f'{1/iters:.2f}s/it'
 
-                self.pbar_kwargs.update(dict(bars=(self.bar_symbol*cols).ljust(self.pbar_col),
+                self.pbar_kwargs.update(dict(bars=(self.character*cols).ljust(self.pbar_col),
                                              percent=f'{fraction*100:.0f}%'.rjust(4),
                                              count=f'{counter+1}/{total}',
                                              t_ran=format_seconds(time_passed),

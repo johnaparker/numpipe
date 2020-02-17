@@ -20,8 +20,6 @@ from numpipe.h5cache import h5cache
 from numpipe.utility import once
 from numpipe import display, config
 
-NUM_ROWS = config.get_terminal_rows()
-
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
     def __init__(self, function, args=(), kwargs={}, num_iterations=None):

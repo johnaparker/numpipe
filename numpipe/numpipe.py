@@ -36,7 +36,6 @@ from numpipe.parser import run_parser
 from numpipe.networking import recv_msg,send_msg
 
 USE_SERVER = False
-NUM_ROWS = config.get_terminal_rows()
 
 class scheduler:
     """Deferred function evaluation and access to cached function output"""
@@ -128,6 +127,7 @@ class scheduler:
         """Run the requested cached functions and at-end functions"""
         self.args = run_parser()
         numpipe._pbars.mininterval = self.args.mininterval
+        numpipe._pbars.character = config.get_config()['progress']['character']
         self.fix_block_names()
 
         ### display only event

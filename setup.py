@@ -31,20 +31,18 @@ def read(fname):
 def post_install():
     config_str = """
 [execution]
-    parallel_default = true
+    parallel_default = true    # run with -p flag by default
 
 [notifications]
-    delay_default = 120
+    delay_default = 120    # delay (in seconds) before sending notifications
 
     [notifications.telegram]
-    token = ""
-    chat_id = 0
+    token = ""     # Telegram bot token
+    chat_id = 0    # Telegram chat ID
 
 [progress]
-    ascii = false
-    max_rows = 100
-    character = "#"
-    mininterval = 0.1
+    character = "#"      # progress bar character
+    mininterval = 0.1    # minimum interval (in seconds) between progress bar updates
 """.strip()
 
     config_path = pathlib.Path('~/.config/numpipe/numpipe.conf').expanduser()
