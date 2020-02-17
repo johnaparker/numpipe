@@ -32,6 +32,7 @@ class progress_bars:
         self.mininterval = mininterval
         self.pbar_kwargs['desc'] = ''
         self.placeholder = False
+        self.complete = True
 
         ### global variables
         self.lock = Lock()
@@ -64,9 +65,10 @@ class progress_bars:
             self.set_desc(desc)
 
         with self.lock:
-            if not self.placeholder:
+            if not self.placeholder and self.complete:
                 self.pos = self.pos_g.value
                 self.pos_g.value += 1
+                self.complete = False
             else:
                 self.placeholder = False
                 self._initialize_bar(total)
@@ -92,24 +94,27 @@ class progress_bars:
                                              t_left=format_seconds(time_left)))
 
                 with self.lock:
-                    if counter == total-1:
-                        self.finish_bar()
-                    else:
-                        self._write_pbar_str()
+                    self._write_pbar_str()
+                    # if counter == total-1:
+                        # self.finish_bar(move=False)
+                    # else:
+                        # self._write_pbar_str()
 
                 ctime = time()
 
             yield val
 
-    def finish_bar(self):
+    def finish_bar(self, move=True):
         """set the bar status to complete"""
         if self.placeholder:
             desc = self.pbar_kwargs['desc']
-            self._move_bar(line=colored(f'{desc}Finished', color='green', attrs=['bold']))
+            if move:
+                self._move_bar(line=colored(f'{desc}Finished', color='green', attrs=['bold']))
         else:
             self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='green', attrs=['bold'])
             self._write_pbar_str(flush=False)
-            self._move_bar()
+            if move:
+                self._move_bar()
 
     def fail_bar(self):
         """set the bar status to failure"""

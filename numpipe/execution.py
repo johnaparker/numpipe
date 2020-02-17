@@ -142,12 +142,18 @@ def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
     except:
         if cache is not None:
             cache.flush()
+        numpipe._pbars.complete = True
         numpipe._pbars.fail_bar()
         raise Exception(f"Cached function '{name}' failed:\n" + "".join(traceback.format_exception(*sys.exc_info())))
 
-    if numpipe._pbars.placeholder:
-        with numpipe._pbars.lock:
+    with numpipe._pbars.lock:
+        if numpipe._pbars.placeholder:
             numpipe._pbars.finish_bar()
+        else:
+            numpipe._pbars.finish_bar()
+
+    numpipe._pbars.complete = True
+
 
 def execute_block_debug(block, name, mpi_rank, instances, cache_time, number, total):
     desc = f'({1+number}/{total}) {name}'
@@ -191,9 +197,14 @@ def execute_block_debug(block, name, mpi_rank, instances, cache_time, number, to
                 raise ValueError(f"Invalid return type: function '{name}' needs to return a dictionary of symbols")
 
     except Exception as err:
+        numpipe._pbars.complete = True
         numpipe._pbars.fail_bar()
         raise err
 
-    if numpipe._pbars.placeholder:
-        with numpipe._pbars.lock:
+    with numpipe._pbars.lock:
+        if numpipe._pbars.placeholder:
             numpipe._pbars.finish_bar()
+        else:
+            numpipe._pbars.finish_bar()
+
+    numpipe._pbars.complete = True
