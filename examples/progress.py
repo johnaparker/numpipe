@@ -1,9 +1,9 @@
 import numpipe
+from numpipe import pbar
 from time import sleep
 
 ### Setup
 job = numpipe.scheduler()
-pbar = job.progress
 
 import numpy as np
 N = 100

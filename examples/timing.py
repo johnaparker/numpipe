@@ -1,9 +1,8 @@
-from numpipe import scheduler
+from numpipe import scheduler, pbar
 import numpy as np
 from time import sleep
 
 job = scheduler()
-pbar = job.progress
 
 @job.cache
 def sim():

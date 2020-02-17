@@ -120,9 +120,6 @@ class scheduler:
 
         return self.blocks[label].target.load()
 
-    def progress(self, it):
-        return numpipe._pbars.progress(it)
-
     def execute(self):
         """Run the requested cached functions and at-end functions"""
         self.args = run_parser()

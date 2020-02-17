@@ -20,6 +20,7 @@ from . import progress
 from .utility import once
 from .numpipe import scheduler
 from .parameters import parameter, gather, outer
-from .progress import progress_bars
 
-_pbars = progress_bars()
+_pbars = progress.progress_bars()
+def pbar(it):
+    return _pbars.progress(it)
