@@ -46,8 +46,11 @@ class progress_bars:
         """set the number of jobs"""
         self.pbar_kwargs['desc'] = f'{desc}: '
 
-    def make_placeholder(self, desc=None):
-        next(self.progress(range(100), desc=desc))
+    def make_placeholder(self):
+        desc = self.pbar_kwargs['desc']
+        next(self.progress(range(100)))
+        with self.lock:
+            self._write_line(f'{desc}Running...')
         self.placeholder = True
 
     def progress(self, it, mininterval=None, desc=None):
@@ -64,8 +67,9 @@ class progress_bars:
             if not self.placeholder:
                 self.pos = self.pos_g.value
                 self.pos_g.value += 1
-
-            self._initialize_bar(total)
+            else:
+                self.placeholder = False
+                self._initialize_bar(total)
 
         ctime = time()
         start_time = time()
@@ -99,25 +103,34 @@ class progress_bars:
 
     def finish_bar(self):
         """set the bar status to complete"""
-        self.placeholder = False
-        self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='green', attrs=['bold'])
-        self._write_pbar_str(flush=False)
-        self._move_bar()
+        if self.placeholder:
+            desc = self.pbar_kwargs['desc']
+            self._move_bar(line=colored(f'{desc}Finished', color='green', attrs=['bold']))
+        else:
+            self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='green', attrs=['bold'])
+            self._write_pbar_str(flush=False)
+            self._move_bar()
 
     def fail_bar(self):
         """set the bar status to failure"""
         with self.lock:
-            self.placeholder = False
-            self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='red', attrs=['bold'])
-            self._write_pbar_str(flush=False)
-            self._move_bar()
+            if self.placeholder:
+                desc = self.pbar_kwargs['desc']
+                self._move_bar(line=colored(f'{desc}Failed', color='red', attrs=['bold']))
+            else:
+                self.pbar_kwargs['desc'] = colored(self.pbar_kwargs['desc'], color='red', attrs=['bold'])
+                self._write_pbar_str(flush=False)
+                self._move_bar()
 
-    def _move_bar(self):
+    def _move_bar(self, line=None):
         """move the pbar to cursor and move the cursor down"""
         pos = self.pos_arr[self.pos]
 
         self._clear_line(flush=False)
-        self._write_pbar_str(pos=0, flush=False)
+        if line is None:
+            self._write_pbar_str(pos=0, flush=False)
+        else:
+            self._write_line(line, pos=0, flush=False)
         print(flush=True)
 
         for i,val in enumerate(self.pos_arr):

@@ -100,7 +100,7 @@ class block:
 def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
     desc = f'({1+number}/{total}) {name}'
     numpipe._pbars.set_desc(desc)
-    numpipe._pbars.make_placeholder(desc)
+    numpipe._pbars.make_placeholder()
 
     cache = None
     try:
@@ -152,7 +152,7 @@ def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
 def execute_block_debug(block, name, mpi_rank, instances, cache_time, number, total):
     desc = f'({1+number}/{total}) {name}'
     numpipe._pbars.set_desc(desc)
-    numpipe._pbars.make_placeholder(desc)
+    numpipe._pbars.make_placeholder()
 
     try:
         func = block.deferred_function
