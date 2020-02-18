@@ -27,6 +27,7 @@ def run_parser():
         p.add_argument('--no-deps', action='store_true', default=False, help='do not rerun functions that depend on other reran functions')
         p.add_argument('--mininterval', type=float, default=mininterval, help='time (in seconds) for progress bar mininterval argument')
         p.add_argument('--notify', action='store_true', default=False, help='send notifications without delay')
+        p.add_argument('--notify-message', type=str, default=None, help='send a custom message with other notifications')
         p.add_argument('--notify-delay', type=float, default=notifications_default_delay, help='time (in seconds) before notifications will be sent')
 
         p.add_argument('--theme', default='normal', type=str, help='matplotlib plot theme')

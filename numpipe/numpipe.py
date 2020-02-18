@@ -127,6 +127,9 @@ class scheduler:
         numpipe._pbars.character = config.get_config()['progress']['character']
         self.fix_block_names()
 
+        if self.args.notify_message is not None:
+            self.notifications.append(partial(notify.send_message_from, self.args.notify_message, self.filename))
+
         ### display only event
         if self.args.action == 'display':
             self.display_functions()

@@ -104,6 +104,16 @@ def send_message(message):
     bot = Bot(token=get_bot_token())
     bot.send_message(chat_id=get_chat_id(), text=message, parse_mode=ParseMode.MARKDOWN)
 
+def send_message_from(message, filename):
+    """send a text message with """
+    from telegram import Bot, ParseMode
+
+    host = socket.gethostname()
+    message = f'*{message}*' + f'\n_{host}:{filename}_'
+
+    bot = Bot(token=get_bot_token())
+    bot.send_message(chat_id=get_chat_id(), text=message, parse_mode=ParseMode.MARKDOWN)
+
 def send_finish_message(filename, njobs, time, num_exceptions):
     """send a text message summarizing the jobs that ran
 
