@@ -45,7 +45,7 @@ job.add(sim4, 'A', param=3)
 job.add(sim4, 'A', param=4)
 job.add(sim4, 'B', param=4)
 
-@job.at_end
+@job.plots
 def vis():
     """visualize the data"""
     cache = job.load(sim1)
@@ -53,7 +53,7 @@ def vis():
     cache = job.load(sim2)
     plt.plot(x, cache.z)
 
-    for name, cache in job.load(sim4, 'A'):
+    for name, cache in job.load(sim4):
         print(f'{name} instance has y = {cache.y} with param = {cache.args.param}')
     # with job.load(sim4, defer=True) as cache:
     plt.show()

@@ -280,6 +280,9 @@ class scheduler:
 
                 for func in self.at_end_functions.values():
                     func()
+            else:
+                if self.args.notify:
+                    self.send_notifications(check_idle=False, idle=True)
 
     def ready_to_run(self, block):
         if block.dependencies is None:
@@ -485,12 +488,16 @@ class scheduler:
                     filepath = mpl_tools.get_filepath(filename, arg)
                     mpl_tools.save_animation(anim, filepath)
 
-            if self.num_blocks_executed > 0 and send_figures:
+            if (self.num_blocks_executed > 0 or self.args.notify) and send_figures:
                 self.notifications.append(partial(notify.send_images,
                                             filename=self.filename, exempt=animated_figs))
                 self.notifications.append(partial(notify.send_videos,
                                             anims=self.animations.values()))
-            self.send_notifications()
+
+            if self.args.notify:
+                self.send_notifications(check_idle=False, idle=True)
+            else:
+                self.send_notifications()
 
             plt.show = show_copy
             if self.args.figures is not None:
@@ -517,11 +524,12 @@ class scheduler:
         else:
             add_single_animation(anim)
 
-    def send_notifications(self):
+    def send_notifications(self, **kwargs):
         if self.mpi_rank == 0:
             t = threading.Thread(target=partial(notify.send_notifications, 
                                            notifications=self.notifications,
-                                           delay=self.args.notify_delay))
+                                           delay=self.args.notify_delay,
+                                           **kwargs))
             t.start()
 
     def shared(self, class_type):
