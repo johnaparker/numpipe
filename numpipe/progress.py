@@ -10,7 +10,10 @@ from fcntl import ioctl
 from array import array
 
 def get_terminal_rows_cols():
-    return array('h', ioctl(sys.stdout, TIOCGWINSZ, '\0' * 8))[:2]
+    try:
+        return array('h', ioctl(sys.stdout, TIOCGWINSZ, '\0' * 8))[:2]
+    except:
+        return (50,100)
 
 def format_seconds(T):
     """format time T (in seconds) to a display string"""
