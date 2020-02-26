@@ -481,8 +481,10 @@ class scheduler:
 
             if self.args.save_figs != '' or self.args.save != '':
                 arg = self.args.save_figs if self.args.save_figs != '' else self.args.save
-                mpl_tools.save_figures(self.filename, arg,
-                                       self.args.figures, exempt=animated_figs)
+                for ext in self.args.save_format:
+                    mpl_tools.save_figures(self.filename, arg,
+                                           self.args.figures, exempt=animated_figs,
+                                           ext=ext)
 
             if self.args.save_anims != '' or self.args.save != '':
                 arg = self.args.save_anims if self.args.save_anims != '' else self.args.save

@@ -18,7 +18,7 @@ def get_filepath(filename, dirpath=None):
     dirpath = pathlib.Path(dirpath).expanduser()
     return dirpath / filename
 
-def save_figures(prefix, dirpath=None, figures=None, exempt=None):
+def save_figures(prefix, dirpath=None, figures=None, exempt=None, ext='png'):
     """save all current matplotlib figures
 
     Arguments:
@@ -26,6 +26,7 @@ def save_figures(prefix, dirpath=None, figures=None, exempt=None):
         dirpath   path to directory where files are saved (default: current working directory)
         figures   list of figure numbers to display (default: all)
         exempt    list of figure numbers to not display, overriding figures argument (default: none)
+        ext       file format extension (default: png)
     """
     all_fignums = plt.get_fignums()
     if figures is None:
@@ -40,7 +41,7 @@ def save_figures(prefix, dirpath=None, figures=None, exempt=None):
         fignums = set(fignums) - set(exempt)
 
     for i in fignums:
-        filepath = get_filepath(f'{prefix}_fig{i}.png', dirpath)
+        filepath = get_filepath(f'{prefix}_fig{i}.{ext}', dirpath)
         fig = plt.figure(i)
         fig.savefig(filepath)
 
