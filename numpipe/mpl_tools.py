@@ -43,7 +43,7 @@ def save_figures(prefix, dirpath=None, figures=None, exempt=None, ext='png'):
     for i in fignums:
         filepath = get_filepath(f'{prefix}_fig{i}.{ext}', dirpath)
         fig = plt.figure(i)
-        fig.savefig(filepath)
+        fig.savefig(filepath, bbox_inches='tight')
 
 def save_animation(animation, filename, *args, **kwargs):
     """A wrapper for anim.save(...) that shows the progress of the saving
