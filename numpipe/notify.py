@@ -213,7 +213,7 @@ def send_videos(anims):
             plt.close(anim_list[0]._fig)
             filepath = f'{direc}/vid{i}.mp4'
             send_animation(bot, chat_id, anim_list, filepath)
-            bot.send_animation(chat_id, animation=open(filepath, 'rb'))
+            bot.send_video(chat_id, video=open(filepath, 'rb'))
 
 def send_animation(bot, chat_id, anim_list, filepath, *args, **kwargs):
     """send a single animation for a given bot and chat_id
