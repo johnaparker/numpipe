@@ -17,7 +17,6 @@ import threading
 import socket
 import pickle
 import numpy as np
-from mpi4py import MPI
 import subprocess
 from time import sleep, time
 from functools import partial
@@ -73,7 +72,6 @@ class scheduler:
             send_msg(self.pipe, pickle.dumps(['new', 'ID']))
 
         self.complete = False
-        self.mpi_rank = MPI.COMM_WORLD.Get_rank()
         self.notifications = []
 
     #TODO implement load all, jdefer
@@ -158,16 +156,11 @@ class scheduler:
                     blocks_to_execute.update({label: self.blocks[label] for label in labels})
 
             self.resolve_dependencies_down(blocks_to_execute)
-
             self.num_blocks_executed = len(blocks_to_execute)
-            aborting = False
-            if self.mpi_rank == 0:
-                overwriten = self._overwrite([block.target for block in blocks_to_execute.values()])
-                if not overwriten:
-                    aborting = True
-                    display.abort_message()
-            aborting = MPI.COMM_WORLD.bcast(aborting, root=0)
-            if aborting:
+
+            overwriten = self._overwrite([block.target for block in blocks_to_execute.values()])
+            if not overwriten:
+                display.abort_message()
                 return
 
             self.resolve_dependencies_up(blocks_to_execute)
@@ -203,7 +196,7 @@ class scheduler:
                         for name in remaining:
                             block = blocks_to_execute[name]
                             if self.ready_to_run(block):
-                                execute_block_debug(block, name, self.mpi_rank, self.instances,
+                                execute_block_debug(block, name, self.instances,
                                          self.args.cache_time, num_blocks_ran, self.num_blocks_executed)
                                 to_delete.append(name)
                                 block.complete = True
@@ -225,7 +218,7 @@ class scheduler:
                                 block = blocks_to_execute[name]
                                 if self.ready_to_run(block):
                                     results[name] = pool.apply_async(execute_block, 
-                                            (block, name, self.mpi_rank, self.instances, self.args.cache_time, num_blocks_ran, self.num_blocks_executed))
+                                            (block, name, self.instances, self.args.cache_time, num_blocks_ran, self.num_blocks_executed))
                                     to_delete.append(name)
                                     num_blocks_ran += 1
 
@@ -258,7 +251,7 @@ class scheduler:
 
                         self.complete = True
 
-                        if blocks_to_execute and self.mpi_rank == 0:
+                        if blocks_to_execute:
                             self.notifications.append(partial(notify.send_finish_message,
                                                         filename=self.filename, 
                                                         njobs=len(blocks_to_execute),
@@ -277,15 +270,14 @@ class scheduler:
         
 
         ### At-end functions
-        if self.mpi_rank == 0:
-            if self.at_end_functions and not self.args.no_at_end:
-                display.at_end_message()
+        if self.at_end_functions and not self.args.no_at_end:
+            display.at_end_message()
 
-                for func in self.at_end_functions.values():
-                    func()
-            else:
-                if self.args.notify:
-                    self.send_notifications(check_idle=False, idle=True)
+            for func in self.at_end_functions.values():
+                func()
+        else:
+            if self.args.notify:
+                self.send_notifications(check_idle=False, idle=True)
 
     def ready_to_run(self, block):
         if block.dependencies is None:
@@ -530,20 +522,17 @@ class scheduler:
             add_single_animation(anim)
 
     def send_notifications(self, **kwargs):
-        if self.mpi_rank == 0:
-            t = threading.Thread(target=partial(notify.send_notifications, 
-                                           notifications=self.notifications,
-                                           delay=self.args.notify_delay,
-                                           **kwargs))
-            t.start()
+        t = threading.Thread(target=partial(notify.send_notifications, 
+                                       notifications=self.notifications,
+                                       delay=self.args.notify_delay,
+                                       **kwargs))
+        t.start()
 
     def shared(self, class_type):
         """decorator to add a class for shared variables"""
         return class_type
 
     def display_functions(self):
-        if not self.mpi_rank == 0:
-            return
         display.display_message(self.blocks, self.instances, self.at_end_functions)
 
     def _clean(self, filepaths):
@@ -552,9 +541,6 @@ class scheduler:
            Argumnets: 
                filepaths      list of filepaths to hdf5 files
         """
-        if not self.mpi_rank == 0:
-            return
-
         if filepaths:
             if not self.args.force:
                 delete = display.delete_message(filepaths)
@@ -573,9 +559,6 @@ class scheduler:
            Argumnets: 
                targets        list of targets to delete
         """
-        if not self.mpi_rank == 0:
-            return
-
         targets_to_delete = list(filter(lambda t: t.exists(), targets))
         filepaths = [target.filepath for target in targets_to_delete]
 
@@ -659,10 +642,9 @@ class scheduler:
                 labels = self.get_labels(name)
                 targets_to_delete.extend([self.blocks[label].target for label in labels])
 
-        if self.mpi_rank == 0:
-            overwriten = self._overwrite(targets_to_delete)
-            if not overwriten:
-                display.abort_message()
+        overwriten = self._overwrite(targets_to_delete)
+        if not overwriten:
+            display.abort_message()
 
         return
 

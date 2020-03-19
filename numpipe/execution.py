@@ -8,7 +8,6 @@ import h5py
 import numpy as np
 from typing import Iterable
 import traceback
-from mpi4py import MPI
 import types
 from functools import partial
 import numpipe
@@ -97,7 +96,7 @@ class block:
             self.dependencies.extend(new_deps)
 
 # @yield_traceback
-def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
+def execute_block(block, name, instances, cache_time, number, total):
     desc = f'({1+number}/{total}) {name}'
     numpipe._pbars.set_desc(desc)
     numpipe._pbars.make_placeholder()
@@ -105,12 +104,10 @@ def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
     cache = None
     try:
         func = block.deferred_function
-        if mpi_rank == 0:
-            if func.__name__ in instances and name in instances[func.__name__]:
-                ### write arguments if instance funcitont 
-                block.target.write_args(func.kwargs)
+        if func.__name__ in instances and name in instances[func.__name__]:
+            ### write arguments if instance funcitont 
+            block.target.write_args(func.kwargs)
 
-        MPI.COMM_WORLD.Barrier()
         symbols = func()
 
         ### Generator functions
@@ -119,16 +116,14 @@ def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
 
             ### iterate over all symbols, caching each one
             for next_symbols in symbols:
-                if mpi_rank == 0:
-                    if type(next_symbols) is once:
-                        block.target.write(next_symbols)
-                    else:
-                        for symbol_name, next_symbol in next_symbols.items():
-                            cache.add(symbol_name, next_symbol)
+                if type(next_symbols) is once:
+                    block.target.write(next_symbols)
+                else:
+                    for symbol_name, next_symbol in next_symbols.items():
+                        cache.add(symbol_name, next_symbol)
 
             ### empty any of the remaining cache
-            if mpi_rank == 0:
-                cache.flush()
+            cache.flush()
 
         ### Standard Functions
         else:
@@ -148,19 +143,17 @@ def execute_block(block, name, mpi_rank, instances, cache_time, number, total):
     with numpipe._pbars.lock:
         numpipe._pbars.finish_bar()
 
-def execute_block_debug(block, name, mpi_rank, instances, cache_time, number, total):
+def execute_block_debug(block, name, instances, cache_time, number, total):
     desc = f'({1+number}/{total}) {name}'
     numpipe._pbars.set_desc(desc)
     numpipe._pbars.make_placeholder()
 
     try:
         func = block.deferred_function
-        if mpi_rank == 0:
-            if func.__name__ in instances and name in instances[func.__name__]:
-                ### write arguments if instance funcitont 
-                block.target.write_args(func.kwargs)
+        if func.__name__ in instances and name in instances[func.__name__]:
+            ### write arguments if instance funcitont 
+            block.target.write_args(func.kwargs)
 
-        MPI.COMM_WORLD.Barrier()
         symbols = func()
 
         ### Generator functions
@@ -169,16 +162,14 @@ def execute_block_debug(block, name, mpi_rank, instances, cache_time, number, to
 
             ### iterate over all symbols, caching each one
             for next_symbols in symbols:
-                if mpi_rank == 0:
-                    if type(next_symbols) is once:
-                        block.target.write(next_symbols)
-                    else:
-                        for symbol_name, next_symbol in next_symbols.items():
-                            cache.add(symbol_name, next_symbol)
+                if type(next_symbols) is once:
+                    block.target.write(next_symbols)
+                else:
+                    for symbol_name, next_symbol in next_symbols.items():
+                        cache.add(symbol_name, next_symbol)
 
             ### empty any of the remaining cache
-            if mpi_rank == 0:
-                cache.flush()
+            cache.flush()
 
         ### Standard Functions
         else:
