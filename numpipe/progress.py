@@ -5,15 +5,43 @@ from termcolor import colored
 from time import time
 import os
 import sys
-from termios import TIOCGWINSZ
-from fcntl import ioctl
 from array import array
 
-def get_terminal_rows_cols():
-    try:
-        return array('h', ioctl(sys.stdout, TIOCGWINSZ, '\0' * 8))[:2]
-    except:
-        return (50,100)
+def _windows_cols_func():
+    from ctypes import windll, create_string_buffer
+    import struct
+
+    def f():
+        try:
+            h = windll.kernel32.GetStdHandle(-12)
+            csbi = create_string_buffer(22)
+            res = windll.kernel32.GetConsoleScreenBufferInfo(h, csbi)
+            if res:
+                (_bufx, _bufy, _curx, _cury, _wattr, left, _top, right, _bottom,
+                 _maxx, _maxy) = struct.unpack("hhhhHhhhhhh", csbi.raw)
+                return right - left
+        except:
+            return 50
+
+    return f
+
+def _nix_cols_func():
+    from termios import TIOCGWINSZ
+    from fcntl import ioctl
+    def f():
+        try:
+            return array('h', ioctl(sys.stdout, TIOCGWINSZ, '\0' * 8))[1]
+        except:
+            return 50
+
+    return f
+
+def get_terminal_cols_func():
+    platform = sys.platform
+    if 'win' in platform.lower():
+        return _windows_cols_func()
+    else:
+        return _nix_cols_func()
 
 def format_seconds(T):
     """format time T (in seconds) to a display string"""
@@ -37,7 +65,8 @@ class progress_bars:
         self.pbar_fmt = '{desc}{percent}|{bars}| {count} [{t_ran}<{t_left}, {iters}]'
         self.pbar_kwargs = dict()
         self.pos = 0
-        self.max_col = get_terminal_rows_cols()[1]
+        self.col_func = get_terminal_cols_func()
+        self.max_col = self.col_func()
         self.num_bars = 5
         self.character = character  # '█'
         self.mininterval = mininterval
@@ -91,7 +120,7 @@ class progress_bars:
         for counter, val in enumerate(it):
             if time() - ctime > mininterval or counter == total-1:
                 fraction = (counter+1)/total
-                self.max_col = get_terminal_rows_cols()[1]
+                self.max_col = self.col_func()
 
                 time_passed = time() - start_time
                 iters = counter/time_passed
