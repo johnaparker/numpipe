@@ -17,6 +17,13 @@ from numpipe.h5cache import h5cache
 from numpipe.utility import once
 from numpipe import display, config
 
+def is_windows():
+    platform = sys.platform
+    if 'win' in platform.lower():
+        return True
+    else:
+        return False
+
 class deferred_function:
     """wrapper around a function -- to defer its execution and store metadata"""
     def __init__(self, function, args=(), kwargs={}, num_iterations=None):
@@ -98,6 +105,8 @@ def execute_block(block, name, instances, cache_time, number, total):
     desc = f'({1+number}/{total}) {name}'
     numpipe._pbars.set_desc(desc)
     numpipe._pbars.make_placeholder()
+    if is_windows():
+        numpipe._pbars.set_njobs(total)
 
     cache = None
     try:
