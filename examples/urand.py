@@ -21,4 +21,5 @@ def vis():
 for i in range(5):
     job.add(sim, f'S{i}', param=i)
 
-job.execute()
+if __name__ == '__main__':
+    job.execute()

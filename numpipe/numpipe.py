@@ -23,7 +23,6 @@ from functools import partial
 from typing import Iterable, types
 import matplotlib.pyplot as plt
 import traceback
-from termcolor import colored
 from copy import copy
 import itertools
 

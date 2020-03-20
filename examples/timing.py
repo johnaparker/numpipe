@@ -21,4 +21,5 @@ def vis():
     var = job.load(sim)
     print(var.counter)
 
-job.execute()
+if __name__ == '__main__':
+    job.execute()

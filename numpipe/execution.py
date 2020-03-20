@@ -10,8 +10,6 @@ from typing import Iterable
 import traceback
 import types
 from functools import partial
-import numpipe
-from termcolor import colored
 
 import numpipe
 from numpipe.fileio import load_symbols, write_symbols

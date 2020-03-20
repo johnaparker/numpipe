@@ -59,4 +59,5 @@ def vis():
     plt.show()
 
 ### execute
-job.execute()
+if __name__ == '__main__':
+    job.execute()

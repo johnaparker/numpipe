@@ -22,4 +22,5 @@ for i in range(10):
     job.add(progress, i=i)
 
 ### execute
-job.execute()
+if __name__ == '__main__':
+    job.execute()

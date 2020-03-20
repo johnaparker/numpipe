@@ -27,5 +27,5 @@ def third():
 
     return {}
 
-### execute
-job.execute()
+if __name__ == '__main__':
+    job.execute()

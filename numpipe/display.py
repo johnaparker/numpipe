@@ -1,8 +1,14 @@
 from termcolor import colored
+import colorama
 import subprocess
+colorama.init()
 
 def prompt_to_delete():
-    delete = input(colored(f"Continue with job? (y/n) ", color='yellow', attrs=['bold']))
+    # delete = input(colored(f"Continue with job? (y/n) ", color='yellow', attrs=['bold']))
+    # return delete
+    
+    print(colored(f"Continue with job? (y/n) ", color='yellow', attrs=['bold']), end='')
+    delete = input()
     return delete
 
 def abort_message():

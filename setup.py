@@ -21,7 +21,7 @@ REQUIRED = [
     'toml',
     'matplotlib',
     'tqdm',
-    'mpi4py',
+    'colorama',
     'python-telegram-bot',
 ]
 

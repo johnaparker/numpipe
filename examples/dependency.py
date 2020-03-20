@@ -26,4 +26,5 @@ def D():
 job.add(C, i=0)
 job.add(C, i=1).depends(B)
 
-job.execute()
+if __name__ == '__main__':
+    job.execute()
