@@ -20,6 +20,7 @@ def run_parser():
         p.add_argument('-r', '--rerun', nargs='*', type=str, default=None, help='re-run specific cached functions by name')
         p.add_argument('-f', '--force', action='store_true', help='force over-write any existing cached data')
         p.add_argument('-d', '--delete', nargs='*', type=str, default=None, help='delete specified cached data')
+        p.add_argument('-e', '--exclude', nargs='+', type=str, default=[], help='exclude cached function from being re-run')
         p.add_argument('--at-end', action='store_true', default=False, help="only run at_end functions")
         p.add_argument('--no-at-end', action='store_true', default=False, help="don't run at_end functions")
         p.add_argument('-p', '--processes', nargs='?', default=processes_default, type=int, help='number of processes to use in parallel execution (default: cpu_count)')

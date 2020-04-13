@@ -154,6 +154,10 @@ class scheduler:
                     labels = self.get_labels(name)
                     blocks_to_execute.update({label: self.blocks[label] for label in labels})
 
+            for name in self.args.exclude:
+                for key in self.get_labels(name):
+                    blocks_to_execute.pop(key, 0)
+
             self.resolve_dependencies_down(blocks_to_execute)
             self.num_blocks_executed = len(blocks_to_execute)
 
