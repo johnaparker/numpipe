@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 import traceback
 from copy import copy
 import itertools
+import warnings
 
 import numpipe
 from numpipe import slurm, display, notify, mpl_tools, config
@@ -39,6 +40,8 @@ class scheduler:
     """Deferred function evaluation and access to cached function output"""
 
     def __init__(self, dirpath=None):
+        warnings.simplefilter("default")
+
         self.blocks = dict()
         self.instances = dict()
         self.instance_counts = dict()
@@ -59,10 +62,6 @@ class scheduler:
 
         self.filename = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 
-        self.logfile = pathlib.Path(self.dirpath) / f'{self.filename}.log'
-        logging.basicConfig(filename=self.logfile, filemode='w', level=logging.INFO,
-                            format='%(levelname)s: %(message)s')
-        logging.captureWarnings(True)
 
         if USE_SERVER:
             address = ('localhost', 6000)
@@ -118,7 +117,12 @@ class scheduler:
         return self.blocks[label].target.load()
 
     def execute(self):
+        warnings.warn('use scheduler.run() instead of scheduler.execute()', DeprecationWarning)
+        self.run()
+
+    def run(self):
         """Run the requested cached functions and at-end functions"""
+        self._init_logging()
         self.args = run_parser()
         numpipe._pbars.mininterval = self.args.mininterval
         numpipe._pbars.character = config.get_config()['progress']['character']
@@ -664,3 +668,9 @@ class scheduler:
         confirm = self._clean(filepaths)
         if not confirm:
             display.abort_message()
+
+    def _init_logging(self):
+        self.logfile = pathlib.Path(self.dirpath) / f'{self.filename}.log'
+        logging.basicConfig(filename=self.logfile, filemode='w', level=logging.INFO,
+                            format='%(levelname)s: %(message)s')
+        logging.captureWarnings(True)

@@ -25,4 +25,4 @@ def vis():
     var = job.load(sim)
     print(f'The stored value: x = {var.x}')
 
-job.execute()
+job.run()

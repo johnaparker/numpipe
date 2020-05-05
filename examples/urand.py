@@ -22,4 +22,4 @@ for i in range(5):
     job.add(sim, f'S{i}', param=i)
 
 if __name__ == '__main__':
-    job.execute()
+    job.run()

@@ -27,4 +27,4 @@ job.add(C, i=0)
 job.add(C, i=1).depends(B)
 
 if __name__ == '__main__':
-    job.execute()
+    job.run()
