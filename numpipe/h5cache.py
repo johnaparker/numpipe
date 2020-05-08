@@ -88,37 +88,40 @@ class h5cache:
         self.cache = dict()
         self.h5path = dict()
 
-    def add(self, name, record, group='/', chunk_size=None):
+    def add(self, records, group='/', chunk_size=None):
         """
         Add a record to the cached data
 
         Arguments:
-            name         name of dataset inside group
-            record       record to cache (must have same shape as original record)
+            records      dict of {name: record} to cache (record must have same shape as original record)
             group        name of group in h5 file
             chunk_size   size of h5 chunks (default: attempts to choose best)
         """
+        is_full = False
 
-        try:
-            is_full = self.cache[name].add(record)
-        except KeyError:
-            record = np.asarray(record)
-            shape = record.shape
-            dtype = record.dtype
+        for name, record in records.items():
+            try:
+                record_is_full = self.cache[name].add(record)
+            except KeyError:
+                record = np.asarray(record)
+                shape = record.shape
+                dtype = record.dtype
 
-            if chunk_size is None:
-                size_dtype = np.dtype(dtype).itemsize
-                chunk_size = auto_chunk_size(size_dtype*np.prod(shape))
+                if chunk_size is None:
+                    size_dtype = np.dtype(dtype).itemsize
+                    chunk_size = auto_chunk_size(size_dtype*np.prod(shape))
 
-            h5path = f'{group}/{name}'
+                h5path = f'{group}/{name}'
 
-            with h5py.File(self.filepath, 'a') as f:
-                dset = f.create_dataset(h5path, shape=(0,) + shape, chunks=(chunk_size,) + shape, maxshape=(None,) + shape, dtype=dtype)
+                with h5py.File(self.filepath, 'a') as f:
+                    dset = f.create_dataset(h5path, shape=(0,) + shape, chunks=(chunk_size,) + shape, maxshape=(None,) + shape, dtype=dtype)
 
-            self.h5path[name] = h5path
-            self.cache[name] = npcache(shape, dtype)
+                self.h5path[name] = h5path
+                self.cache[name] = npcache(shape, dtype)
 
-            is_full = self.cache[name].add(record)
+                record_is_full = self.cache[name].add(record)
+
+            is_full = max(is_full, record_is_full)
 
         if is_full or (time.time() - self.time_start) > self.cache_time:
             self.flush()
