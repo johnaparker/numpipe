@@ -18,7 +18,7 @@ pip install numpipe
 
 ## Examples
 
-### single simulation
+### single task
 ```python
 from numpipe import scheduler, pbar
 from time import sleep
@@ -29,7 +29,7 @@ job = scheduler()
 @job.cache
 def sim():
     for i in pbar(range(100)):
-        sleep(.1)
+        sleep(.1)   # long running task...
         yield dict(i=i, x=i**2)
 
 @job.plots
@@ -37,8 +37,37 @@ def vis():
     var = job.load(sim)
     plt.plot(var.i, var.x)
 
-job.run()
+if __name__ == '__main__':
+    job.run()
 ```
+
+### parallel tasks
+```python
+from numpipe import scheduler, pbar
+from time import sleep
+import matplotlib.pyplot as plt
+
+job = scheduler()
+
+@job.cache
+def sim(power):
+    for i in pbar(range(100)):
+        sleep(.1)   # long running task...
+        yield dict(i=i, x=i**power)
+
+@job.plots
+def vis():
+    for name, var in job.load(sim):
+        plt.plot(var.i, var.x)
+
+for i in range(3):
+    job.add(sim, power=i)
+
+if __name__ == '__main__':
+    job.run()
+```
+### more examples
+See the [examples folder](https://github.com/johnaparker/numpipe/tree/master/examples) for more usage examples
 
 ## Command line arguments
 ```
