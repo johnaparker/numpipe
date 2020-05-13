@@ -37,8 +37,8 @@ def _nix_cols_func():
     return f
 
 def get_terminal_cols_func():
-    platform = sys.platform
-    if 'win' in platform.lower():
+    platform = sys.platform.lower()
+    if platform != 'darwin' and 'win' in platform:
         return _windows_cols_func()
     else:
         return _nix_cols_func()
