@@ -3,6 +3,7 @@ from datetime import datetime
 from time import time, sleep
 from numpipe import config
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 DEFAULT_DELAY = config.get_config()['notifications']['delay_default']
 
@@ -70,9 +71,12 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
         if not plt.get_fignums():
             return
 
-    x0 = fig.canvas.manager.window.x()
-    y0 = fig.canvas.manager.window.y()
-    w0 = fig.canvas.manager.window.size()
+    backend = mpl.get_backend()
+    qt_backends = ('Qt4Agg', 'Qt5Agg')
+    if backend in qt_backends:
+        x0 = fig.canvas.manager.window.x()
+        y0 = fig.canvas.manager.window.y()
+        w0 = fig.canvas.manager.window.size()
 
     t_start = time()
     while time() - t_start < delay:
@@ -83,18 +87,20 @@ def check_idle_matplotlib(delay=DEFAULT_DELAY, check_every=.5):
             return False
         if key_pressed:
             return False
-        if not fig.canvas.manager.window.isActiveWindow():
-            return False
 
-        x = fig.canvas.manager.window.x()
-        y = fig.canvas.manager.window.y()
-        w = fig.canvas.manager.window.size()
+        if backend in qt_backends:
+            if not fig.canvas.manager.window.isActiveWindow():
+                return False
 
-        if x != x0 or y != y0:
-            return False
+            x = fig.canvas.manager.window.x()
+            y = fig.canvas.manager.window.y()
+            w = fig.canvas.manager.window.size()
 
-        if w != w0:
-            return False
+            if x != x0 or y != y0:
+                return False
+
+            if w != w0:
+                return False
 
     return True
 
