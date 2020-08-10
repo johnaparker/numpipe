@@ -171,8 +171,7 @@ def execute_block_debug(block, name, instances, cache_time, number, total):
                 if type(next_symbols) is once:
                     block.target.write(next_symbols)
                 else:
-                    for symbol_name, next_symbol in next_symbols.items():
-                        cache.add(symbol_name, next_symbol)
+                    cache.add(next_symbols)
 
             ### empty any of the remaining cache
             cache.flush()
